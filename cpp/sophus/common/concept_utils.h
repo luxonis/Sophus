@@ -25,4 +25,9 @@ concept EnumType = std::is_enum_v<TT>;
 template <class TT>
 concept Arithmetic = std::is_arithmetic_v<TT>;
 
+template <class From, class To>
+concept ConvertibleTo = std::is_convertible_v<From, To> && requires {
+  static_cast<To>(std::declval<From>());
+};
+
 }  // namespace sophus

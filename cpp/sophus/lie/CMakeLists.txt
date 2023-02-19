@@ -49,3 +49,4 @@ if(BUILD_FARM_NG_PROTOS)
 endif()
 
 add_subdirectory(interp)
+add_subdirectory(experimental)
