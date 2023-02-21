@@ -28,7 +28,7 @@ concept LieGroupImplConcept =
            Eigen::Vector<typename T::Scalar, T::kPointDim> point,
            Eigen::Vector<typename T::Scalar, T::kNumParams> params,
            Eigen::Matrix<typename T::Scalar, T::kAmbientDim, T::kAmbientDim>
-               compactMatrix,
+               matrix,
            Eigen::Matrix<typename T::Scalar, T::kDof, T::kDof> adjoint) {
   // constructors and factories
   {
@@ -48,18 +48,17 @@ concept LieGroupImplConcept =
     } -> ConvertibleTo<Eigen::Vector<typename T::Scalar, T::kDof>>;
 
   {
+    T::hat(tangent)
+    } -> ConvertibleTo<
+        Eigen::Matrix<typename T::Scalar, T::kAmbientDim, T::kAmbientDim>>;
+
+  {
+    T::vee(matrix)
+    } -> ConvertibleTo<Eigen::Vector<typename T::Scalar, T::kDof>>;
+
+  {
     T::adj(params)
     } -> ConvertibleTo<Eigen::Matrix<typename T::Scalar, T::kDof, T::kDof>>;
-
-  // {
-  //   T::hat(params, tangent)
-  //   } -> ConvertibleTo<
-  //       Eigen::Matrix<typename T::Scalar, T::kAmbientDim,
-  //       T::kAmbientDim>>;
-
-  // {
-  //   T::vee(params, compactMatrix)
-  //   } -> ConvertibleTo<Eigen::Vector<typename T::Scalar, T::kDof>>;
 
   // group operations
   {
@@ -177,6 +176,16 @@ class Rotation2Impl {
       -> Eigen::Vector<Scalar, kDof> {
     using std::atan2;
     return Eigen::Vector<Scalar, 1>{atan2(unit_complex.y(), unit_complex.x())};
+  }
+
+  static auto hat(Eigen::Vector<Scalar, kDof> const& angle)
+      -> Eigen::Matrix<Scalar, kAmbientDim, kAmbientDim> {
+    return Eigen::Matrix<Scalar, 2, 2>{{0, -angle[0]}, {angle[0], 0}};
+  }
+
+  static auto vee(Eigen::Matrix<Scalar, kAmbientDim, kAmbientDim> const& mat)
+      -> Eigen::Matrix<Scalar, kDof, 1> {
+    return Eigen::Matrix<Scalar, kDof, 1>{mat(1, 0)};
   }
 
   static auto adj(Eigen::Vector<Scalar, kNumParams> const&)
@@ -345,6 +354,17 @@ class Scaling2Impl {
         log(scale_factors[0]), log(scale_factors[1]));
   }
 
+  static auto hat(Eigen::Vector<Scalar, kDof> const& scale_factors)
+      -> Eigen::Matrix<Scalar, kAmbientDim, kAmbientDim> {
+    return Eigen::Matrix<Scalar, kAmbientDim, kAmbientDim>::diagonal(
+        scale_factors);
+  }
+
+  static auto vee(Eigen::Matrix<Scalar, kAmbientDim, kAmbientDim> const& mat)
+      -> Eigen::Matrix<Scalar, kDof, 1> {
+    return mat.diagonal();
+  }
+
   static auto adj(Eigen::Vector<Scalar, kNumParams> const&)
       -> Eigen::Matrix<Scalar, kDof, kDof> {
     return Eigen::Matrix<Scalar, 1, 1>::Identity();
@@ -497,6 +517,17 @@ class DirectProduct {
     return tangent(
         LeftGroup::log(leftParams(params)),
         RightGroup::log(rightParams(params)));
+  }
+
+  static auto hat(Eigen::Vector<Scalar, kDof> const& scale_factors)
+      -> Eigen::Matrix<Scalar, kAmbientDim, kAmbientDim> {
+    return LeftGroup::hat(leftTangent(scale_factors)) +
+           RightGroup::hat(rightTangent(scale_factors));
+  }
+
+  static auto vee(Eigen::Matrix<Scalar, kAmbientDim, kAmbientDim> const& mat)
+      -> Eigen::Matrix<Scalar, kDof, 1> {
+    return tangent(LeftGroup::vee(mat), RightGroup::vee(mat));
   }
 
   static auto adj(Eigen::Vector<Scalar, kNumParams> const& params)
@@ -682,15 +713,33 @@ class SemiDirectProductWithTranslation {
         LeftGroup::leftJacobianInverse(left_params) * translation(params));
   }
 
+  static auto hat(Eigen::Vector<Scalar, kDof> const& tangent)
+      -> Eigen::Matrix<Scalar, kAmbientDim, kAmbientDim> {
+    Eigen::Matrix<Scalar, kAmbientDim, kAmbientDim> hat_mat =
+        LeftGroup::hat(leftTangent(tangent));
+    hat_mat.template topRightCorner<kPointDim, 1>() =
+        translationTangent(tangent);
+    return hat_mat;
+  }
+
+  static auto vee(Eigen::Matrix<Scalar, kAmbientDim, kAmbientDim> const& mat)
+      -> Eigen::Matrix<Scalar, kDof, 1> {
+    return tangent(
+        LeftGroup::vee(mat), mat.template topRightCorner<kPointDim, 1>());
+  }
+
   static auto adj(Eigen::Vector<Scalar, kNumParams> const& params)
       -> Eigen::Matrix<Scalar, kDof, kDof> {
     Eigen::Matrix<Scalar, kDof, kDof> mat_adjoint;
 
+    Eigen::Vector<Scalar, kPointDim + 1> translation_and_0;
+    translation_and_0.template head<kPointDim>() = translation(params);
+    translation_and_0[kPointDim] = 0.0;
+
     mat_adjoint.template topLeftCorner<kPointDim, kPointDim>() =
         LeftGroup::matrix(leftParams(params));
-    // mat_adjoint.template topRightCorner<kPointDim, LeftGroup::kDof>() =
-    //     skewSymmetricMatrix<kPointDim>(translation()) *
-    //     LeftGroup::adj(leftParams(params));
+    mat_adjoint.template topRightCorner<kPointDim, LeftGroup::kDof>() =
+        LeftGroup::hat(translation_and_0) * LeftGroup::adj(leftParams(params));
 
     mat_adjoint.template bottomLeftCorner<LeftGroup::kDof, LeftGroup::kDof>()
         .setZero();
@@ -873,6 +922,14 @@ class Group {
 
   auto log() const -> Eigen::Vector<Scalar, kDof> {
     return TImpl::log(this->params_);
+  }
+
+  static auto hat(Eigen::Vector<Scalar, kDof> const& tangent) {
+    return TImpl::hat(tangent);
+  }
+
+  static auto vee(Eigen::Matrix<Scalar, kAmbientDim, kAmbientDim> const& mat) {
+    return TImpl::vee(mat);
   }
 
   auto adj() const -> Eigen::Vector<Scalar, kDof> {
