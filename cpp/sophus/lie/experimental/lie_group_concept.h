@@ -26,10 +26,18 @@ concept LieGroupImplConcept =
            T g,
            Eigen::Vector<typename T::Scalar, T::kDof> tangent,
            Eigen::Vector<typename T::Scalar, T::kPointDim> point,
-           Eigen::Vector<typename T::Scalar, T::kNumParams> params) {
+           Eigen::Vector<typename T::Scalar, T::kNumParams> params,
+           Eigen::Matrix<typename T::Scalar, T::kAmbientDim, T::kAmbientDim>
+               compactMatrix,
+           Eigen::Matrix<typename T::Scalar, T::kDof, T::kDof> adjoint) {
+  // constructors and factories
   {
     T::identityParams()
     } -> ConvertibleTo<Eigen::Vector<typename T::Scalar, T::kNumParams>>;
+
+  { T::areParamsValid(params) } -> ConvertibleTo<sophus::Expected<Success>>;
+
+  // Manifold / Lie Group concepts
 
   {
     T::exp(tangent)
@@ -40,19 +48,42 @@ concept LieGroupImplConcept =
     } -> ConvertibleTo<Eigen::Vector<typename T::Scalar, T::kDof>>;
 
   {
+    T::adj(params)
+    } -> ConvertibleTo<Eigen::Matrix<typename T::Scalar, T::kDof, T::kDof>>;
+
+  // {
+  //   T::hat(params, tangent)
+  //   } -> ConvertibleTo<
+  //       Eigen::Matrix<typename T::Scalar, T::kAmbientDim,
+  //       T::kAmbientDim>>;
+
+  // {
+  //   T::vee(params, compactMatrix)
+  //   } -> ConvertibleTo<Eigen::Vector<typename T::Scalar, T::kDof>>;
+
+  // group operations
+  {
+    T::multiplication(params, params)
+    } -> ConvertibleTo<Eigen::Vector<typename T::Scalar, T::kNumParams>>;
+
+  {
     T::inverse(params)
     } -> ConvertibleTo<Eigen::Vector<typename T::Scalar, T::kNumParams>>;
+
+  // Point actions
 
   {
     T::action(params, point)
     } -> ConvertibleTo<Eigen::Vector<typename T::Scalar, T::kPointDim>>;
 
   {
-    T::multiplication(params, params)
-    } -> ConvertibleTo<Eigen::Vector<typename T::Scalar, T::kNumParams>>;
+    T::toAmbient(point)
+    } -> ConvertibleTo<Eigen::Vector<typename T::Scalar, T::kAmbientDim>>;
+
+  // Matrices
 
   {
-    T::matrix(params)
+    T::compactMatrix(params)
     } -> ConvertibleTo<
         Eigen::Matrix<typename T::Scalar, T::kPointDim, T::kAmbientDim>>;
 
@@ -61,6 +92,7 @@ concept LieGroupImplConcept =
     } -> ConvertibleTo<
         Eigen::Matrix<typename T::Scalar, T::kAmbientDim, T::kAmbientDim>>;
 
+  // for tests
   {
     T::exampleTangents()
     } -> ConvertibleTo<std::vector<Eigen::Vector<typename T::Scalar, T::kDof>>>;
@@ -69,12 +101,6 @@ concept LieGroupImplConcept =
     T::exampleParams()
     } -> ConvertibleTo<
         std::vector<Eigen::Vector<typename T::Scalar, T::kNumParams>>>;
-
-  { T::areParamsValid(params) } -> ConvertibleTo<sophus::Expected<Success>>;
-
-  {
-    T::toAmbient(point)
-    } -> ConvertibleTo<Eigen::Vector<typename T::Scalar, T::kAmbientDim>>;
 };
 
 template <class T>
@@ -105,6 +131,303 @@ auto unproj(
   return out;
 }
 
+template <class TScalar>
+class Rotation2Impl {
+ public:
+  using Scalar = TScalar;
+  static int const kDof = 1;
+  static int const kNumParams = 2;
+  static int const kPointDim = 2;
+  static int const kAmbientDim = 2;
+
+  // constructors and factories
+
+  static auto identityParams() -> Eigen::Vector<Scalar, kNumParams> {
+    return Eigen::Vector<Scalar, 2>(1.0, 0.0);
+  }
+
+  static auto areParamsValid(
+      Eigen::Vector<Scalar, kNumParams> const& unit_complex)
+      -> sophus::Expected<Success> {
+    static const Scalar kThr = kEpsilon<Scalar> * kEpsilon<Scalar>;
+    const Scalar squared_norm = unit_complex.squaredNorm();
+    using std::abs;
+    if (!(abs(squared_norm - 1.0) <= kThr)) {
+      return FARM_UNEXPECTED(
+          "complex number ({}, {}) is not unit length.\n"
+          "Squared norm: {}, thr: {}",
+          unit_complex[0],
+          unit_complex[1],
+          squared_norm,
+          kThr);
+    }
+    return sophus::Expected<Success>{};
+  }
+
+  // Manifold / Lie Group concepts
+
+  static auto exp(Eigen::Vector<Scalar, kDof> const& angle)
+      -> Eigen::Vector<Scalar, kNumParams> {
+    using std::cos;
+    using std::sin;
+    return Eigen::Vector<Scalar, 2>(cos(angle[0]), sin(angle[0]));
+  }
+
+  static auto log(Eigen::Vector<Scalar, kNumParams> const& unit_complex)
+      -> Eigen::Vector<Scalar, kDof> {
+    using std::atan2;
+    return Eigen::Vector<Scalar, 1>{atan2(unit_complex.y(), unit_complex.x())};
+  }
+
+  static auto adj(Eigen::Vector<Scalar, kNumParams> const&)
+      -> Eigen::Matrix<Scalar, kDof, kDof> {
+    return Eigen::Matrix<Scalar, 1, 1>::Identity();
+  }
+
+  // group operations
+
+  static auto inverse(Eigen::Vector<Scalar, kNumParams> const& unit_complex)
+      -> Eigen::Vector<Scalar, kNumParams> {
+    return Eigen::Vector<Scalar, kNumParams>(
+        unit_complex.x(), -unit_complex.y());
+  }
+
+  static auto multiplication(
+      Eigen::Vector<Scalar, kNumParams> const& lhs_params,
+      Eigen::Vector<Scalar, kNumParams> const& rhs_params)
+      -> Eigen::Vector<Scalar, kNumParams> {
+    Scalar const lhs_real = lhs_params.x();
+    Scalar const lhs_imag = lhs_params.y();
+    Scalar const rhs_real = rhs_params.x();
+    Scalar const rhs_imag = rhs_params.y();
+
+    // complex multiplication
+    Scalar const result_real = lhs_real * rhs_real - lhs_imag * rhs_imag;
+    Scalar const result_imag = lhs_real * rhs_imag + lhs_imag * rhs_real;
+
+    Scalar const squared_norm =
+        result_real * result_real + result_imag * result_imag;
+    // We can assume that the squared-norm is close to 1 since we deal with a
+    // unit complex number. Due to numerical precision issues, there might
+    // be a small drift after pose concatenation. Hence, we need to renormalizes
+    // the complex number here.
+    // Since squared-norm is close to 1, we do not need to calculate the costly
+    // square-root, but can use an approximation around 1 (see
+    // http://stackoverflow.com/a/12934750 for details).
+    if (squared_norm != 1.0) {
+      Scalar const scale = 2.0 / (1.0 + squared_norm);
+      return Eigen::Vector<Scalar, kNumParams>(
+          result_real * scale, result_imag * scale);
+    }
+    return Eigen::Vector<Scalar, kNumParams>(result_real, result_imag);
+  }
+
+  // Point actions
+  static auto action(
+      Eigen::Vector<Scalar, kNumParams> const& unit_complex,
+      Eigen::Vector<Scalar, kPointDim> const& point)
+      -> Eigen::Vector<Scalar, kPointDim> {
+    Eigen::Vector<Scalar, kPointDim> out;
+    Scalar const lhs_real = unit_complex.x();
+    Scalar const lhs_imag = unit_complex.y();
+    Scalar const rhs_real = point.x();
+    Scalar const rhs_imag = point.y();
+
+    // complex multiplication
+    out[0] = lhs_real * rhs_real - lhs_imag * rhs_imag;
+    out[1] = lhs_real * rhs_imag + lhs_imag * rhs_real;
+
+    return out;
+  }
+
+  static auto toAmbient(Eigen::Vector<Scalar, kPointDim> const& point)
+      -> Eigen::Vector<Scalar, kAmbientDim> {
+    return point;
+  }
+
+  // matrices
+
+  static auto compactMatrix(
+      Eigen::Vector<Scalar, kNumParams> const& unit_complex)
+      -> Eigen::Matrix<Scalar, kPointDim, kPointDim> {
+    return Eigen::Matrix<Scalar, 2, 2>{
+        {unit_complex.x(), -unit_complex.y()},
+        {unit_complex.y(), unit_complex.x()}};
+  }
+
+  static auto homogeneousMatrix(
+      Eigen::Vector<Scalar, kNumParams> const& unit_complex)
+      -> Eigen::Matrix<Scalar, kPointDim, kPointDim> {
+    return compactMatrix(unit_complex);
+  }
+
+  // left Jacobian
+
+  static auto leftJacobian(Eigen::Vector<Scalar, kNumParams> const&)
+      -> Eigen::Matrix<Scalar, kPointDim, kPointDim> {
+    return Eigen::Matrix<Scalar, kPointDim, kPointDim>::Identity();
+  }
+
+  static auto leftJacobianInverse(Eigen::Vector<Scalar, kNumParams> const&)
+      -> Eigen::Matrix<Scalar, kPointDim, kPointDim> {
+    return Eigen::Matrix<Scalar, kPointDim, kPointDim>::Identity();
+  }
+
+  // for tests
+
+  static auto exampleTangents() -> std::vector<Eigen::Vector<Scalar, kDof>> {
+    return std::vector<Eigen::Vector<Scalar, kDof>>({
+        Eigen::Vector<Scalar, kDof>({0.0}),
+        Eigen::Vector<Scalar, kDof>({0.00001}),
+        Eigen::Vector<Scalar, kDof>({1.0}),
+        Eigen::Vector<Scalar, kDof>({-1.0}),
+        Eigen::Vector<Scalar, kDof>({5.0}),
+        Eigen::Vector<Scalar, kDof>({0.5 * kPi<Scalar>}),
+        Eigen::Vector<Scalar, kDof>({0.5 * kPi<Scalar> + 0.00001}),
+    });
+  }
+
+  static auto exampleParams()
+      -> std::vector<Eigen::Vector<Scalar, kNumParams>> {
+    return std::vector<Eigen::Vector<Scalar, kNumParams>>({
+        Rotation2Impl::exp(Eigen::Vector<Scalar, kDof>{0.0}),
+        Rotation2Impl::exp(Eigen::Vector<Scalar, kDof>{1.0}),
+        Rotation2Impl::exp(Eigen::Vector<Scalar, kDof>{0.5 * kPi<Scalar>}),
+        Rotation2Impl::exp(Eigen::Vector<Scalar, kDof>{kPi<Scalar>}),
+    });
+  }
+};
+
+template <class TScalar>
+class Scaling2Impl {
+ public:
+  using Scalar = TScalar;
+  static int const kDof = 2;
+  static int const kNumParams = 2;
+  static int const kPointDim = 2;
+  static int const kAmbientDim = 2;
+
+  // constructors and factories
+
+  static auto identityParams() -> Eigen::Vector<Scalar, kNumParams> {
+    return Eigen::Vector<Scalar, 2>(1.0, 1.0);
+  }
+
+  static auto areParamsValid(
+      Eigen::Vector<Scalar, kNumParams> const& scale_factors)
+      -> sophus::Expected<Success> {
+    static const Scalar kThr = kEpsilon<Scalar>;
+
+    if (!(scale_factors.array() >= kThr).all()) {
+      return FARM_UNEXPECTED(
+          "scale factors ({}, {}) not positive.\n",
+          "thr: {}",
+          scale_factors[0],
+          scale_factors[1],
+          kThr);
+    }
+    return sophus::Expected<Success>{};
+  }
+
+  // Manifold / Lie Group concepts
+
+  static auto exp(Eigen::Vector<Scalar, kDof> const& log_scale_factors)
+      -> Eigen::Vector<Scalar, kNumParams> {
+    using std::exp;
+    return Eigen::Vector<Scalar, 2>(
+        exp(log_scale_factors[0]), exp(log_scale_factors[1]));
+  }
+
+  static auto log(Eigen::Vector<Scalar, kNumParams> const& scale_factors)
+      -> Eigen::Vector<Scalar, kDof> {
+    using std::log;
+    return Eigen::Vector<Scalar, 2>(
+        log(scale_factors[0]), log(scale_factors[1]));
+  }
+
+  static auto adj(Eigen::Vector<Scalar, kNumParams> const&)
+      -> Eigen::Matrix<Scalar, kDof, kDof> {
+    return Eigen::Matrix<Scalar, 1, 1>::Identity();
+  }
+
+  // group operations
+
+  static auto inverse(Eigen::Vector<Scalar, kNumParams> const& scale_factors)
+      -> Eigen::Vector<Scalar, kNumParams> {
+    return Eigen::Vector<Scalar, 2>(
+        1.0 / scale_factors[0], 1.0 / scale_factors[1]);
+  }
+
+  static auto multiplication(
+      Eigen::Vector<Scalar, kNumParams> const& lhs_params,
+      Eigen::Vector<Scalar, kNumParams> const& rhs_params)
+      -> Eigen::Vector<Scalar, kNumParams> {
+    return Eigen::Vector<Scalar, 2>(
+        lhs_params[0] * rhs_params[0], lhs_params[1] * rhs_params[1]);
+  }
+
+  // Point actions
+
+  static auto action(
+      Eigen::Vector<Scalar, kNumParams> const& scale_factors,
+      Eigen::Vector<Scalar, kPointDim> const& point)
+      -> Eigen::Vector<Scalar, kPointDim> {
+    return Eigen::Vector<Scalar, 2>(
+        point[0] * scale_factors[0], point[1] * scale_factors[1]);
+  }
+
+  static auto toAmbient(Eigen::Vector<Scalar, kPointDim> const& point)
+      -> Eigen::Vector<Scalar, kAmbientDim> {
+    return point;
+  }
+  // Matrices
+
+  static auto compactMatrix(
+      Eigen::Vector<Scalar, kNumParams> const& scale_factors)
+      -> Eigen::Matrix<Scalar, kPointDim, kAmbientDim> {
+    return Eigen::Matrix<Scalar, 2, 2>{
+        {scale_factors[0], 0.0}, {0.0, scale_factors[1]}};
+  }
+
+  static auto homogeneousMatrix(
+      Eigen::Vector<Scalar, kNumParams> const& scale_factors)
+      -> Eigen::Matrix<Scalar, kAmbientDim, kAmbientDim> {
+    return compactMatrix(scale_factors);
+  }
+
+  // left Jacobian
+
+  static auto leftJacobian(Eigen::Vector<Scalar, kNumParams> const&)
+      -> Eigen::Matrix<Scalar, kPointDim, kPointDim> {
+    return Eigen::Matrix<Scalar, kPointDim, kPointDim>::Identity();
+  }
+
+  static auto leftJacobianInverse(Eigen::Vector<Scalar, kNumParams> const&)
+      -> Eigen::Matrix<Scalar, kPointDim, kPointDim> {
+    return Eigen::Matrix<Scalar, kPointDim, kPointDim>::Identity();
+  }
+
+  // for tests
+
+  static auto exampleTangents() -> std::vector<Eigen::Vector<Scalar, kDof>> {
+    return std::vector<Eigen::Vector<Scalar, kDof>>({
+        Eigen::Vector<Scalar, kDof>({std::exp(1.0), std::exp(1.0)}),
+        Eigen::Vector<Scalar, kDof>({1.1, 1.1}),
+        Eigen::Vector<Scalar, kDof>({2.0, 1.1}),
+        Eigen::Vector<Scalar, kDof>({2.0, std::exp(1.0)}),
+    });
+  }
+
+  static auto exampleParams()
+      -> std::vector<Eigen::Vector<Scalar, kNumParams>> {
+    return std::vector<Eigen::Vector<Scalar, kDof>>(
+        {Eigen::Vector<Scalar, kDof>({1.0, 1.0}),
+         Eigen::Vector<Scalar, kDof>({1.0, 2.0}),
+         Eigen::Vector<Scalar, kDof>({1.5, 1.0}),
+         Eigen::Vector<Scalar, kDof>({5.0, 1.237})});
+  }
+};
+
 template <
     class TScalar,
     template <class>
@@ -127,95 +450,10 @@ class DirectProduct {
   static_assert(kAmbientDim == RightGroup::kAmbientDim);
   static_assert(kPointDim == kAmbientDim);
 
+  // constructors and factories
+
   static auto identityParams() -> Eigen::Vector<Scalar, kNumParams> {
     return params(LeftGroup::identityParams(), RightGroup::identityParams());
-  }
-
-  static auto exp(Eigen::Vector<Scalar, kDof> tangent)
-      -> Eigen::Vector<Scalar, kNumParams> {
-    return params(
-        LeftGroup::exp(leftTangent(tangent)),
-        RightGroup::exp(rightTangent(tangent)));
-  }
-
-  static auto log(Eigen::Vector<Scalar, kNumParams> const& params)
-      -> Eigen::Vector<Scalar, kDof> {
-    return tangent(
-        LeftGroup::log(leftParams(params)),
-        RightGroup::log(rightParams(params)));
-  }
-
-  static auto inverse(Eigen::Vector<Scalar, kNumParams> const& params)
-      -> Eigen::Vector<Scalar, kNumParams> {
-    return params(
-        LeftGroup::inverse(leftParams(params)),
-        RightGroup::inverse(rightParams(params)));
-  }
-
-  static auto multiplication(
-      Eigen::Vector<Scalar, kNumParams> const& lhs_params,
-      Eigen::Vector<Scalar, kNumParams> const& rhs_params)
-      -> Eigen::Vector<Scalar, kNumParams> {
-    return params(
-        LeftGroup::multiplication(
-            leftParams(lhs_params), leftParams(rhs_params)),
-        RightGroup::multiplication(
-            rightParams(lhs_params), rightParams(rhs_params)));
-  }
-
-  static auto action(
-      Eigen::Vector<Scalar, kNumParams> const& params,
-      Eigen::Vector<Scalar, kPointDim> const& point)
-      -> Eigen::Vector<Scalar, kPointDim> {
-    Eigen::Vector<Scalar, kPointDim> hop1 =
-        RightGroup::action(rightParams(params), point);
-    Eigen::Vector<Scalar, kPointDim> hop2 =
-        LeftGroup::action(leftParams(params), hop1);
-    return hop2;
-  }
-
-  static auto matrix(Eigen::Vector<Scalar, kNumParams> const& params)
-      -> Eigen::Matrix<Scalar, kPointDim, kPointDim> {
-    return LeftGroup::matrix(leftParams(params)) *
-           RightGroup::matrix(rightParams(params));
-  }
-
-  static auto homogeneousMatrix(Eigen::Vector<Scalar, kNumParams> const& params)
-      -> Eigen::Matrix<Scalar, kPointDim, kPointDim> {
-    return matrix(params);
-  }
-
-  static auto leftJacobian(Eigen::Vector<Scalar, kNumParams> const&)
-      -> Eigen::Matrix<Scalar, kPointDim, kPointDim> {
-    return LeftGroup::leftJacobian(leftParams(params)) *
-           RightGroup::leftJacobian(rightParams(params));
-  }
-
-  static auto leftJacobianInverse(Eigen::Vector<Scalar, kNumParams> const&)
-      -> Eigen::Matrix<Scalar, kPointDim, kPointDim> {
-    return LeftGroup::leftJacobianInverse(leftParams(params)) *
-           RightGroup::leftJacobianInverse(rightParams(params));
-  }
-
-  static auto exampleTangents() -> std::vector<Eigen::Vector<Scalar, kDof>> {
-    std::vector<Eigen::Vector<Scalar, kDof>> examples;
-    for (auto const& left_tangent : LeftGroup::exampleTangents()) {
-      for (auto const& right_tangents : RightGroup::exampleTangents()) {
-        examples.push_back(tagent(left_tangent, right_tangents));
-      }
-    }
-    return examples;
-  }
-
-  static auto exampleParams()
-      -> std::vector<Eigen::Vector<Scalar, kNumParams>> {
-    std::vector<Eigen::Vector<Scalar, kNumParams>> examples;
-    for (auto const& left_params : LeftGroup::exampleParams()) {
-      for (auto const& right_params : RightGroup::exampleParams()) {
-        examples.push_back(params(left_params, right_params));
-      }
-    }
-    return examples;
   }
 
   static auto areParamsValid(Eigen::Vector<Scalar, kNumParams> const& params)
@@ -245,9 +483,113 @@ class DirectProduct {
     return sophus::Expected<Success>{};
   }
 
+  // Manifold / Lie Group concepts
+
+  static auto exp(Eigen::Vector<Scalar, kDof> tangent)
+      -> Eigen::Vector<Scalar, kNumParams> {
+    return params(
+        LeftGroup::exp(leftTangent(tangent)),
+        RightGroup::exp(rightTangent(tangent)));
+  }
+
+  static auto log(Eigen::Vector<Scalar, kNumParams> const& params)
+      -> Eigen::Vector<Scalar, kDof> {
+    return tangent(
+        LeftGroup::log(leftParams(params)),
+        RightGroup::log(rightParams(params)));
+  }
+
+  static auto adj(Eigen::Vector<Scalar, kNumParams> const& params)
+      -> Eigen::Matrix<Scalar, kDof, kDof> {
+    return LeftGroup::adj(leftParams(params)) *
+           RightGroup::adj(rightParams(params));
+  }
+
+  // group operations
+  static auto multiplication(
+      Eigen::Vector<Scalar, kNumParams> const& lhs_params,
+      Eigen::Vector<Scalar, kNumParams> const& rhs_params)
+      -> Eigen::Vector<Scalar, kNumParams> {
+    return params(
+        LeftGroup::multiplication(
+            leftParams(lhs_params), leftParams(rhs_params)),
+        RightGroup::multiplication(
+            rightParams(lhs_params), rightParams(rhs_params)));
+  }
+
+  static auto inverse(Eigen::Vector<Scalar, kNumParams> const& params)
+      -> Eigen::Vector<Scalar, kNumParams> {
+    return params(
+        LeftGroup::inverse(leftParams(params)),
+        RightGroup::inverse(rightParams(params)));
+  }
+
+  // Point actions
+
+  static auto action(
+      Eigen::Vector<Scalar, kNumParams> const& params,
+      Eigen::Vector<Scalar, kPointDim> const& point)
+      -> Eigen::Vector<Scalar, kPointDim> {
+    Eigen::Vector<Scalar, kPointDim> hop1 =
+        RightGroup::action(rightParams(params), point);
+    Eigen::Vector<Scalar, kPointDim> hop2 =
+        LeftGroup::action(leftParams(params), hop1);
+    return hop2;
+  }
+
   static auto toAmbient(Eigen::Vector<Scalar, kPointDim> const& point)
       -> Eigen::Vector<Scalar, kAmbientDim> {
     return point;
+  }
+
+  // Matrices
+
+  static auto compactMatrix(Eigen::Vector<Scalar, kNumParams> const& params)
+      -> Eigen::Matrix<Scalar, kPointDim, kPointDim> {
+    return LeftGroup::compactMatrix(leftParams(params)) *
+           RightGroup::compactMatrix(rightParams(params));
+  }
+
+  static auto homogeneousMatrix(Eigen::Vector<Scalar, kNumParams> const& params)
+      -> Eigen::Matrix<Scalar, kPointDim, kPointDim> {
+    return compactMatrix(params);
+  }
+
+  // left jacobian
+
+  static auto leftJacobian(Eigen::Vector<Scalar, kNumParams> const&)
+      -> Eigen::Matrix<Scalar, kPointDim, kPointDim> {
+    return LeftGroup::leftJacobian(leftParams(params)) *
+           RightGroup::leftJacobian(rightParams(params));
+  }
+
+  static auto leftJacobianInverse(Eigen::Vector<Scalar, kNumParams> const&)
+      -> Eigen::Matrix<Scalar, kPointDim, kPointDim> {
+    return LeftGroup::leftJacobianInverse(leftParams(params)) *
+           RightGroup::leftJacobianInverse(rightParams(params));
+  }
+
+  // for tests
+
+  static auto exampleTangents() -> std::vector<Eigen::Vector<Scalar, kDof>> {
+    std::vector<Eigen::Vector<Scalar, kDof>> examples;
+    for (auto const& left_tangent : LeftGroup::exampleTangents()) {
+      for (auto const& right_tangents : RightGroup::exampleTangents()) {
+        examples.push_back(tagent(left_tangent, right_tangents));
+      }
+    }
+    return examples;
+  }
+
+  static auto exampleParams()
+      -> std::vector<Eigen::Vector<Scalar, kNumParams>> {
+    std::vector<Eigen::Vector<Scalar, kNumParams>> examples;
+    for (auto const& left_params : LeftGroup::exampleParams()) {
+      for (auto const& right_params : RightGroup::exampleParams()) {
+        examples.push_back(params(left_params, right_params));
+      }
+    }
+    return examples;
   }
 
  private:
@@ -292,262 +634,6 @@ class DirectProduct {
   }
 };
 
-template <class TScalar>
-class Rotation2Impl {
- public:
-  using Scalar = TScalar;
-  static int const kDof = 1;
-  static int const kNumParams = 2;
-  static int const kPointDim = 2;
-  static int const kAmbientDim = 2;
-
-  static auto identityParams() -> Eigen::Vector<Scalar, kNumParams> {
-    return Eigen::Vector<Scalar, 2>(1.0, 0.0);
-  }
-
-  static auto exp(Eigen::Vector<Scalar, kDof> const& angle)
-      -> Eigen::Vector<Scalar, kNumParams> {
-    using std::cos;
-    using std::sin;
-    return Eigen::Vector<Scalar, 2>(cos(angle[0]), sin(angle[0]));
-  }
-
-  static auto log(Eigen::Vector<Scalar, kNumParams> const& unit_complex)
-      -> Eigen::Vector<Scalar, kDof> {
-    using std::atan2;
-    return Eigen::Vector<Scalar, 1>{atan2(unit_complex.y(), unit_complex.x())};
-  }
-
-  static auto inverse(Eigen::Vector<Scalar, kNumParams> const& unit_complex)
-      -> Eigen::Vector<Scalar, kNumParams> {
-    return Eigen::Vector<Scalar, kNumParams>(
-        unit_complex.x(), -unit_complex.y());
-  }
-
-  static auto action(
-      Eigen::Vector<Scalar, kNumParams> const& unit_complex,
-      Eigen::Vector<Scalar, kPointDim> const& point)
-      -> Eigen::Vector<Scalar, kPointDim> {
-    Eigen::Vector<Scalar, kPointDim> out;
-    Scalar const lhs_real = unit_complex.x();
-    Scalar const lhs_imag = unit_complex.y();
-    Scalar const rhs_real = point.x();
-    Scalar const rhs_imag = point.y();
-
-    // complex multiplication
-    out[0] = lhs_real * rhs_real - lhs_imag * rhs_imag;
-    out[1] = lhs_real * rhs_imag + lhs_imag * rhs_real;
-
-    return out;
-  }
-
-  static auto multiplication(
-      Eigen::Vector<Scalar, kNumParams> const& lhs_params,
-      Eigen::Vector<Scalar, kNumParams> const& rhs_params)
-      -> Eigen::Vector<Scalar, kNumParams> {
-    Scalar const lhs_real = lhs_params.x();
-    Scalar const lhs_imag = lhs_params.y();
-    Scalar const rhs_real = rhs_params.x();
-    Scalar const rhs_imag = rhs_params.y();
-
-    // complex multiplication
-    Scalar const result_real = lhs_real * rhs_real - lhs_imag * rhs_imag;
-    Scalar const result_imag = lhs_real * rhs_imag + lhs_imag * rhs_real;
-
-    Scalar const squared_norm =
-        result_real * result_real + result_imag * result_imag;
-    // We can assume that the squared-norm is close to 1 since we deal with a
-    // unit complex number. Due to numerical precision issues, there might
-    // be a small drift after pose concatenation. Hence, we need to renormalizes
-    // the complex number here.
-    // Since squared-norm is close to 1, we do not need to calculate the costly
-    // square-root, but can use an approximation around 1 (see
-    // http://stackoverflow.com/a/12934750 for details).
-    if (squared_norm != 1.0) {
-      Scalar const scale = 2.0 / (1.0 + squared_norm);
-      return Eigen::Vector<Scalar, kNumParams>(
-          result_real * scale, result_imag * scale);
-    }
-    return Eigen::Vector<Scalar, kNumParams>(result_real, result_imag);
-  }
-
-  static auto matrix(Eigen::Vector<Scalar, kNumParams> const& unit_complex)
-      -> Eigen::Matrix<Scalar, kPointDim, kPointDim> {
-    return Eigen::Matrix<Scalar, 2, 2>{
-        {unit_complex.x(), -unit_complex.y()},
-        {unit_complex.y(), unit_complex.x()}};
-  }
-
-  static auto homogeneousMatrix(
-      Eigen::Vector<Scalar, kNumParams> const& unit_complex)
-      -> Eigen::Matrix<Scalar, kPointDim, kPointDim> {
-    return matrix(unit_complex);
-  }
-
-  static auto leftJacobian(Eigen::Vector<Scalar, kNumParams> const&)
-      -> Eigen::Matrix<Scalar, kPointDim, kPointDim> {
-    return Eigen::Matrix<Scalar, kPointDim, kPointDim>::Identity();
-  }
-
-  static auto leftJacobianInverse(Eigen::Vector<Scalar, kNumParams> const&)
-      -> Eigen::Matrix<Scalar, kPointDim, kPointDim> {
-    return Eigen::Matrix<Scalar, kPointDim, kPointDim>::Identity();
-  }
-
-  static auto exampleTangents() -> std::vector<Eigen::Vector<Scalar, kDof>> {
-    return std::vector<Eigen::Vector<Scalar, kDof>>({
-        Eigen::Vector<Scalar, kDof>({0.0}),
-        Eigen::Vector<Scalar, kDof>({0.00001}),
-        Eigen::Vector<Scalar, kDof>({1.0}),
-        Eigen::Vector<Scalar, kDof>({-1.0}),
-        Eigen::Vector<Scalar, kDof>({5.0}),
-        Eigen::Vector<Scalar, kDof>({0.5 * kPi<Scalar>}),
-        Eigen::Vector<Scalar, kDof>({0.5 * kPi<Scalar> + 0.00001}),
-    });
-  }
-
-  static auto exampleParams()
-      -> std::vector<Eigen::Vector<Scalar, kNumParams>> {
-    return std::vector<Eigen::Vector<Scalar, kNumParams>>({
-        Rotation2Impl::exp(Eigen::Vector<Scalar, kDof>{0.0}),
-        Rotation2Impl::exp(Eigen::Vector<Scalar, kDof>{1.0}),
-        Rotation2Impl::exp(Eigen::Vector<Scalar, kDof>{0.5 * kPi<Scalar>}),
-        Rotation2Impl::exp(Eigen::Vector<Scalar, kDof>{kPi<Scalar>}),
-    });
-  }
-
-  static auto areParamsValid(
-      Eigen::Vector<Scalar, kNumParams> const& unit_complex)
-      -> sophus::Expected<Success> {
-    static const Scalar kThr = kEpsilon<Scalar> * kEpsilon<Scalar>;
-    const Scalar squared_norm = unit_complex.squaredNorm();
-    using std::abs;
-    if (!(abs(squared_norm - 1.0) <= kThr)) {
-      return FARM_UNEXPECTED(
-          "complex number ({}, {}) is not unit length.\n"
-          "Squared norm: {}, thr: {}",
-          unit_complex[0],
-          unit_complex[1],
-          squared_norm,
-          kThr);
-    }
-    return sophus::Expected<Success>{};
-  }
-
-  static auto toAmbient(Eigen::Vector<Scalar, kPointDim> const& point)
-      -> Eigen::Vector<Scalar, kAmbientDim> {
-    return point;
-  }
-};
-
-template <class TScalar>
-class Scaling2Impl {
- public:
-  using Scalar = TScalar;
-  static int const kDof = 2;
-  static int const kNumParams = 2;
-  static int const kPointDim = 2;
-  static int const kAmbientDim = 2;
-
-  static auto identityParams() -> Eigen::Vector<Scalar, kNumParams> {
-    return Eigen::Vector<Scalar, 2>(1.0, 1.0);
-  }
-
-  static auto exp(Eigen::Vector<Scalar, kDof> const& log_scale_factors)
-      -> Eigen::Vector<Scalar, kNumParams> {
-    using std::exp;
-    return Eigen::Vector<Scalar, 2>(
-        exp(log_scale_factors[0]), exp(log_scale_factors[1]));
-  }
-  static auto log(Eigen::Vector<Scalar, kNumParams> const& scale_factors)
-      -> Eigen::Vector<Scalar, kDof> {
-    using std::log;
-    return Eigen::Vector<Scalar, 2>(
-        log(scale_factors[0]), log(scale_factors[1]));
-  }
-  static auto inverse(Eigen::Vector<Scalar, kNumParams> const& scale_factors)
-      -> Eigen::Vector<Scalar, kNumParams> {
-    return Eigen::Vector<Scalar, 2>(
-        1.0 / scale_factors[0], 1.0 / scale_factors[1]);
-  }
-  static auto action(
-      Eigen::Vector<Scalar, kNumParams> const& scale_factors,
-      Eigen::Vector<Scalar, kPointDim> const& point)
-      -> Eigen::Vector<Scalar, kPointDim> {
-    return Eigen::Vector<Scalar, 2>(
-        point[0] * scale_factors[0], point[1] * scale_factors[1]);
-  }
-
-  static auto multiplication(
-      Eigen::Vector<Scalar, kNumParams> const& lhs_params,
-      Eigen::Vector<Scalar, kNumParams> const& rhs_params)
-      -> Eigen::Vector<Scalar, kNumParams> {
-    return Eigen::Vector<Scalar, 2>(
-        lhs_params[0] * rhs_params[0], lhs_params[1] * rhs_params[1]);
-  }
-
-  static auto matrix(Eigen::Vector<Scalar, kNumParams> const& scale_factors)
-      -> Eigen::Matrix<Scalar, kPointDim, kAmbientDim> {
-    return Eigen::Matrix<Scalar, 2, 2>{
-        {scale_factors[0], 0.0}, {0.0, scale_factors[1]}};
-  }
-
-  static auto homogeneousMatrix(
-      Eigen::Vector<Scalar, kNumParams> const& scale_factors)
-      -> Eigen::Matrix<Scalar, kAmbientDim, kAmbientDim> {
-    return matrix(scale_factors);
-  }
-
-  static auto exampleTangents() -> std::vector<Eigen::Vector<Scalar, kDof>> {
-    return std::vector<Eigen::Vector<Scalar, kDof>>({
-        Eigen::Vector<Scalar, kDof>({std::exp(1.0), std::exp(1.0)}),
-        Eigen::Vector<Scalar, kDof>({1.1, 1.1}),
-        Eigen::Vector<Scalar, kDof>({2.0, 1.1}),
-        Eigen::Vector<Scalar, kDof>({2.0, std::exp(1.0)}),
-    });
-  }
-
-  static auto exampleParams()
-      -> std::vector<Eigen::Vector<Scalar, kNumParams>> {
-    return std::vector<Eigen::Vector<Scalar, kDof>>(
-        {Eigen::Vector<Scalar, kDof>({1.0, 1.0}),
-         Eigen::Vector<Scalar, kDof>({1.0, 2.0}),
-         Eigen::Vector<Scalar, kDof>({1.5, 1.0}),
-         Eigen::Vector<Scalar, kDof>({5.0, 1.237})});
-  }
-
-  static auto areParamsValid(
-      Eigen::Vector<Scalar, kNumParams> const& scale_factors)
-      -> sophus::Expected<Success> {
-    static const Scalar kThr = kEpsilon<Scalar>;
-
-    if (!(scale_factors.array() >= kThr).all()) {
-      return FARM_UNEXPECTED(
-          "scale factors ({}, {}) not positive.\n",
-          "thr: {}",
-          scale_factors[0],
-          scale_factors[1],
-          kThr);
-    }
-    return sophus::Expected<Success>{};
-  }
-
-  static auto leftJacobian(Eigen::Vector<Scalar, kNumParams> const&)
-      -> Eigen::Matrix<Scalar, kPointDim, kPointDim> {
-    return Eigen::Matrix<Scalar, kPointDim, kPointDim>::Identity();
-  }
-
-  static auto leftJacobianInverse(Eigen::Vector<Scalar, kNumParams> const&)
-      -> Eigen::Matrix<Scalar, kPointDim, kPointDim> {
-    return Eigen::Matrix<Scalar, kPointDim, kPointDim>::Identity();
-  }
-
-  static auto toAmbient(Eigen::Vector<Scalar, kPointDim> const& point)
-      -> Eigen::Vector<Scalar, kAmbientDim> {
-    return point;
-  }
-};
-
 template <class TScalar, int kTranslationDim, template <class> class TLeftGroup>
 requires LeftJacobianImplConcept<TLeftGroup<TScalar>>
 class SemiDirectProductWithTranslation {
@@ -564,10 +650,19 @@ class SemiDirectProductWithTranslation {
   static int const kNumParams = LeftGroup::kNumParams + kPointDim;
   static int const kAmbientDim = kPointDim + 1;
 
+  // constructors and factories
+
   static auto identityParams() -> Eigen::Vector<Scalar, kNumParams> {
     return params(
         LeftGroup::identityParams(), Eigen::Vector<Scalar, kPointDim>::Zero());
   }
+
+  static auto areParamsValid(Eigen::Vector<Scalar, kNumParams> const& params)
+      -> sophus::Expected<Success> {
+    return LeftGroup::areParamsValid(leftParams(params));
+  }
+
+  // Manifold / Lie Group concepts
 
   static auto exp(Eigen::Vector<Scalar, kDof> tangent)
       -> Eigen::Vector<Scalar, kNumParams> {
@@ -587,21 +682,25 @@ class SemiDirectProductWithTranslation {
         LeftGroup::leftJacobianInverse(left_params) * translation(params));
   }
 
-  static auto inverse(Eigen::Vector<Scalar, kNumParams> const& params)
-      -> Eigen::Vector<Scalar, kNumParams> {
-    Eigen::Vector<Scalar, LeftGroup::kNumParams> left_params =
-        LeftGroup::inverse(leftParams(params));
-    return params(
-        left_params, -LeftGroup::action(left_params, translation(params)));
+  static auto adj(Eigen::Vector<Scalar, kNumParams> const& params)
+      -> Eigen::Matrix<Scalar, kDof, kDof> {
+    Eigen::Matrix<Scalar, kDof, kDof> mat_adjoint;
+
+    mat_adjoint.template topLeftCorner<kPointDim, kPointDim>() =
+        LeftGroup::matrix(leftParams(params));
+    // mat_adjoint.template topRightCorner<kPointDim, LeftGroup::kDof>() =
+    //     skewSymmetricMatrix<kPointDim>(translation()) *
+    //     LeftGroup::adj(leftParams(params));
+
+    mat_adjoint.template bottomLeftCorner<LeftGroup::kDof, LeftGroup::kDof>()
+        .setZero();
+    mat_adjoint.template bottomRightCorner<LeftGroup::kDof, LeftGroup::kDof>() =
+        LeftGroup::adj(leftParams(params));
+
+    return mat_adjoint;
   }
 
-  static auto action(
-      Eigen::Vector<Scalar, kNumParams> const& params,
-      Eigen::Vector<Scalar, kPointDim> const& point)
-      -> Eigen::Vector<Scalar, kPointDim> {
-    return LeftGroup::action(leftParams(params), point) + translation(params);
-  }
-
+  // group operations
   static auto multiplication(
       Eigen::Vector<Scalar, kNumParams> const& lhs_params,
       Eigen::Vector<Scalar, kNumParams> const& rhs_params)
@@ -612,11 +711,35 @@ class SemiDirectProductWithTranslation {
     params(left_params, LeftGroup::action(left_params, translation(params)));
   }
 
-  static auto matrix(Eigen::Vector<Scalar, kNumParams> const& params)
+  static auto inverse(Eigen::Vector<Scalar, kNumParams> const& params)
+      -> Eigen::Vector<Scalar, kNumParams> {
+    Eigen::Vector<Scalar, LeftGroup::kNumParams> left_params =
+        LeftGroup::inverse(leftParams(params));
+    return params(
+        left_params, -LeftGroup::action(left_params, translation(params)));
+  }
+
+  // Point actions
+
+  static auto action(
+      Eigen::Vector<Scalar, kNumParams> const& params,
+      Eigen::Vector<Scalar, kPointDim> const& point)
+      -> Eigen::Vector<Scalar, kPointDim> {
+    return LeftGroup::action(leftParams(params), point) + translation(params);
+  }
+
+  static auto toAmbient(Eigen::Vector<Scalar, kPointDim> const& point)
+      -> Eigen::Vector<Scalar, kAmbientDim> {
+    return unproj(point);
+  }
+
+  // Matrices
+
+  static auto compactMatrix(Eigen::Vector<Scalar, kNumParams> const& params)
       -> Eigen::Matrix<Scalar, kPointDim, kAmbientDim> {
     Eigen::Matrix<Scalar, kPointDim, kAmbientDim> mat;
     mat.template topLeftCorner<kPointDim, kPointDim>() =
-        LeftGroup::matrix(leftParams(params));
+        LeftGroup::compactMatrix(leftParams(params));
     mat.template topRightCorner<kPointDim, 1>() = translation(params);
     return mat;
   }
@@ -624,10 +747,13 @@ class SemiDirectProductWithTranslation {
   static auto homogeneousMatrix(Eigen::Vector<Scalar, kNumParams> const& params)
       -> Eigen::Matrix<Scalar, kAmbientDim, kAmbientDim> {
     Eigen::Matrix<Scalar, kAmbientDim, kAmbientDim> mat;
-    mat.template topLeftCorner<kPointDim, kAmbientDim>() = matrix(params);
+    mat.template topLeftCorner<kPointDim, kAmbientDim>() =
+        compactMatrix(params);
     mat.template bottomLeftCorner<1, kPointDim>().setZero();
     mat(kPointDim, kPointDim) = 1.0;
   }
+
+  // for tests
 
   static auto exampleTangents() -> std::vector<Eigen::Vector<Scalar, kDof>> {
     std::vector<Eigen::Vector<Scalar, kDof>> examples;
@@ -649,16 +775,6 @@ class SemiDirectProductWithTranslation {
       }
     }
     return examples;
-  }
-
-  static auto areParamsValid(Eigen::Vector<Scalar, kNumParams> const& params)
-      -> sophus::Expected<Success> {
-    return LeftGroup::areParamsValid(leftParams(params));
-  }
-
-  static auto toAmbient(Eigen::Vector<Scalar, kPointDim> const& point)
-      -> Eigen::Vector<Scalar, kAmbientDim> {
-    return unproj(point);
   }
 
  private:
@@ -735,11 +851,12 @@ class Group {
   static int constexpr kPointDim = TImpl::kPointDim;
   static int constexpr kAmbientDim = TImpl::kAmbientDim;
 
+  // constructors and factories
+
   Group() : params_(TImpl::identityParams()) {}
 
-  static auto exp(Eigen::Vector<Scalar, kDof> const& tangent) -> Group {
-    return Group(TImpl::exp(tangent));
-  }
+  Group(Group const&) = default;
+  Group& operator=(Group const&) = default;
 
   static auto fromParams(Eigen::Vector<Scalar, kNumParams> const& params)
       -> Group {
@@ -748,31 +865,51 @@ class Group {
     return g;
   }
 
+  // Manifold / Lie Group concepts
+
+  static auto exp(Eigen::Vector<Scalar, kDof> const& tangent) -> Group {
+    return Group(TImpl::exp(tangent));
+  }
+
   auto log() const -> Eigen::Vector<Scalar, kDof> {
     return TImpl::log(this->params_);
   }
 
-  auto inverse() const -> Eigen::Vector<Scalar, kNumParams> {
-    return TImpl::inverse(this->params_);
+  auto adj() const -> Eigen::Vector<Scalar, kDof> {
+    return TImpl::adj(this->params_);
   }
+
+  // group operations
+
+  auto operator*(Group const& rhs) const -> Group {
+    return Group(TImpl::multiplication(this->params_, rhs.params_));
+  }
+
+  auto inverse() const -> Group { return Group(TImpl::inverse(this->params_)); }
+
+  // Point actions
 
   auto operator*(Eigen::Vector<Scalar, kPointDim> const& point) const
       -> Eigen::Vector<Scalar, kPointDim> {
     return TImpl::action(this->params_, point);
   }
 
-  auto operator*(Group const& rhs) const -> Group {
-    return TImpl::multiplication(this->params_, rhs.params_);
+  static auto toAmbient(Eigen::Vector<Scalar, kPointDim> const& point) {
+    return TImpl::toAmbient(point);
   }
 
-  auto matrix() const -> Eigen::Matrix<Scalar, kPointDim, kAmbientDim> {
+  // Matrices
+
+  auto compactMatrix() const -> Eigen::Matrix<Scalar, kPointDim, kAmbientDim> {
+    return TImpl::compactMatrix(this->params_);
+  }
+
+  auto matrix(Group const& other) const
+      -> Eigen::Matrix<Scalar, kAmbientDim, kAmbientDim> {
     return TImpl::matrix(this->params_);
   }
 
-  auto homogeneousMatrix(Group const& other) const
-      -> Eigen::Matrix<Scalar, kAmbientDim, kAmbientDim> {
-    return TImpl::homogeneousMatrix(this->params_);
-  }
+  // for tests
 
   static auto exampleTangents() -> std::vector<Eigen::Vector<Scalar, kDof>> {
     return TImpl::exampleTangents();
@@ -783,8 +920,10 @@ class Group {
     return TImpl::exampleParams();
   }
 
-  static auto toAmbient(Eigen::Vector<Scalar, kPointDim> const& point) {
-    return TImpl::toAmbient(point);
+  // getters and setters
+
+  Eigen::Vector<Scalar, kNumParams> const& params() const {
+    return this->params_;
   }
 
   void setParams(Eigen::Vector<Scalar, kNumParams> const& params) {
@@ -794,7 +933,7 @@ class Group {
     this->params_ = params;
   }
 
- private:
+ protected:
   explicit Group(UninitTag /*unused*/) {}
 
   Group(Eigen::Vector<Scalar, kNumParams> const& params) : params_(params) {}
@@ -802,16 +941,71 @@ class Group {
   Eigen::Vector<Scalar, kNumParams> params_;
 };
 
+template <LeftJacobianImplConcept TImpl>
+class GroupWithLeftJacobian : public Group<TImpl> {
+ public:
+  using Scalar = typename TImpl::Scalar;
+  static int constexpr kDof = TImpl::kDof;
+  static int constexpr kNumParams = TImpl::kNumParams;
+  static int constexpr kPointDim = TImpl::kPointDim;
+  static int constexpr kAmbientDim = TImpl::kAmbientDim;
+
+  // constructors and factories
+
+  GroupWithLeftJacobian() : Group<TImpl>() {}
+  GroupWithLeftJacobian(GroupWithLeftJacobian const&) = default;
+  GroupWithLeftJacobian& operator=(GroupWithLeftJacobian const&) = default;
+
+  GroupWithLeftJacobian(Group<TImpl>&& base) : Group<TImpl>(base) {}
+
+  static auto fromParams(Eigen::Vector<Scalar, kNumParams> const& params)
+      -> GroupWithLeftJacobian {
+    return GroupWithLeftJacobian(Group<TImpl>::fromParams(params));
+  }
+
+  // Manifold / Lie Group concepts
+
+  static auto exp(Eigen::Vector<Scalar, kDof> const& tangent)
+      -> GroupWithLeftJacobian {
+    return GroupWithLeftJacobian(Group<TImpl>::exp(tangent));
+  }
+
+  // group operations
+
+  auto operator*(GroupWithLeftJacobian const& rhs) const
+      -> GroupWithLeftJacobian {
+    return GroupWithLeftJacobian(this->Group<TImpl>::operator*(rhs));
+  }
+
+  // Point actions
+
+  // needed so the operator* for group multiplication does not hide the point
+  // action multiplication from the base.
+  using Group<TImpl>::operator*;
+
+  // left Jacobian
+
+  auto leftJacobian() const -> Eigen::Matrix<Scalar, kPointDim, kPointDim> {
+    return TImpl::leftJacobian(Group<TImpl>::fromParams(this->params_));
+  }
+
+  auto leftJacobianInverse(Eigen::Vector<Scalar, kNumParams> const&) const
+      -> Eigen::Matrix<Scalar, kPointDim, kPointDim> {
+    return TImpl::leftJacobianInverse(Group<TImpl>::fromParams(this->params_));
+  }
+};
+
 }  // namespace lie
 
 template <class Scalar>
-using Rotation2 /*aka SO(2) */ = lie::Group<lie::Rotation2Impl<Scalar>>;
+using Rotation2 /*aka SO(2) */ =
+    lie::GroupWithLeftJacobian<lie::Rotation2Impl<Scalar>>;
 
 template <class Scalar>
-using Scaling2 = lie::Group<lie::Scaling2Impl<Scalar>>;
+using Scaling2 = lie::GroupWithLeftJacobian<lie::Scaling2Impl<Scalar>>;
 
 template <class Scalar>
-using ScalingRotation2 = lie::Group<
+using ScalingRotation2 = lie::GroupWithLeftJacobian<
     lie::DirectProduct<Scalar, lie::Scaling2Impl, lie::Rotation2Impl>>;
 
 template <class Scalar>
