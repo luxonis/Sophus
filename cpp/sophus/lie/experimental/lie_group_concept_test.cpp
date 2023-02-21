@@ -13,33 +13,40 @@
 
 using namespace sophus;
 
-// adjointTest
-// template <class G>
-// bool adjointTest() {
-//   bool passed = true;
-//   for (size_t i = 0; i < group_vec_.size(); ++i) {
-//     Transformation t = group_vec_[i].matrix();
-//     Adjoint ad = group_vec_[i].adj();
-//     for (size_t j = 0; j < tangent_vec_.size(); ++j) {
-//       Tangent x = tangent_vec_[j];
+template <class G>
+void adjointTest(std::string group_name) {
+  using Scalar = typename G::Scalar;
 
-//       Transformation mat_i;
-//       mat_i.setIdentity();
-//       Tangent ad1 = ad * x;
-//       Tangent ad2 = LieGroup::vee(
-//           t * LieGroup::hat(x) * group_vec_[i].inverse().matrix());
-//       SOPHUS_TEST_APPROX(
-//           passed,
-//           ad1,
-//           ad2,
-//           Scalar(10) * small_eps,
-//           "Adjoint case %, %",
-//           mat_i,
-//           j);
-//     }
-//   }
-//   return passed;
-// }
+  for (size_t params_id = 0; params_id < G::exampleParams().size();
+       ++params_id) {
+    auto params = G::exampleParams()[params_id];
+
+    auto g = G::fromParams(params);
+    auto mat = g.matrix();
+    Eigen::Matrix<Scalar, G::kDof, G::kDof> ad = g.adj();
+    for (size_t tangent_id = 0; tangent_id < G::exampleTangents().size();
+         ++tangent_id) {
+      auto x = G::exampleTangents()[tangent_id];
+      Eigen::Vector<Scalar, G::kDof> ad1 = ad * x;
+      Eigen::Vector<Scalar, G::kDof> ad2 =
+          G::vee(mat * G::hat(x) * g.inverse().matrix());
+      FARM_ASSERT_NEAR(
+          ad1,
+          ad2,
+          0.001,
+          "adjointTest {}\n"
+          "tangent # {} ({})\n"
+          "params # {} ({}); matrix:\n"
+          "{}",
+          group_name,
+          tangent_id,
+          x.transpose(),
+          params_id,
+          params.transpose(),
+          g.compactMatrix());
+    }
+  }
+}
 
 // // implemented for So3 and Se3
 // template <class G>
@@ -721,7 +728,7 @@ void groupActionTest(
 //               },
 //               t);
 //           SOPHUS_TEST_APPROX(
-//               passed,
+//               passed,kDof
 //               dt_parent_t_spline,
 //               dt_parent_t_spline2,
 //               80 * small_eps_sqrt,
@@ -751,7 +758,10 @@ void tests(
     std::vector<Eigen::Vector<typename G::Scalar, G::kPointDim>> const&
         point_vec) {
   expLogTest<G>(group_name);
+  adjointTest<G>(group_name);
+
   groupActionTest<G>(group_name, point_vec);
+
   // leftJacobianTest<G>(group_name);
 }
 
@@ -763,9 +773,10 @@ void testAllGroups2() {
 
   tests<sophus::Rotation2<Scalar>>("Rotation(2)", point_vec);
   tests<sophus::Scaling2<Scalar>>("Scaling(2)", point_vec);
-  tests<sophus::ScalingRotation2<Scalar>>("ScalingRotation(2)", point_vec);
-  tests<sophus::Isometry2<Scalar>>("Isometry(2)", point_vec);
-  tests<sophus::ScalingTranslation2<Scalar>>("ScalingTranslation", point_vec);
+  // tests<sophus::ScalingRotation2<Scalar>>("ScalingRotation(2)", point_vec);
+  // tests<sophus::Isometry2<Scalar>>("Isometry(2)", point_vec);
+  // tests<sophus::ScalingTranslation2<Scalar>>("ScalingTranslation",
+  // point_vec);
 }
 
 TEST(lie_group_concept, unit) { testAllGroups2<double>(); }

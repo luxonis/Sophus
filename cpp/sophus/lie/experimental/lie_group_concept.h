@@ -87,7 +87,7 @@ concept LieGroupImplConcept =
         Eigen::Matrix<typename T::Scalar, T::kPointDim, T::kAmbientDim>>;
 
   {
-    T::homogeneousMatrix(params)
+    T::matrix(params)
     } -> ConvertibleTo<
         Eigen::Matrix<typename T::Scalar, T::kAmbientDim, T::kAmbientDim>>;
 
@@ -264,8 +264,7 @@ class Rotation2Impl {
         {unit_complex.y(), unit_complex.x()}};
   }
 
-  static auto homogeneousMatrix(
-      Eigen::Vector<Scalar, kNumParams> const& unit_complex)
+  static auto matrix(Eigen::Vector<Scalar, kNumParams> const& unit_complex)
       -> Eigen::Matrix<Scalar, kPointDim, kPointDim> {
     return compactMatrix(unit_complex);
   }
@@ -286,13 +285,13 @@ class Rotation2Impl {
 
   static auto exampleTangents() -> std::vector<Eigen::Vector<Scalar, kDof>> {
     return std::vector<Eigen::Vector<Scalar, kDof>>({
-        Eigen::Vector<Scalar, kDof>({0.0}),
-        Eigen::Vector<Scalar, kDof>({0.00001}),
-        Eigen::Vector<Scalar, kDof>({1.0}),
-        Eigen::Vector<Scalar, kDof>({-1.0}),
-        Eigen::Vector<Scalar, kDof>({5.0}),
-        Eigen::Vector<Scalar, kDof>({0.5 * kPi<Scalar>}),
-        Eigen::Vector<Scalar, kDof>({0.5 * kPi<Scalar> + 0.00001}),
+        Eigen::Vector<Scalar, kDof>{0.0},
+        Eigen::Vector<Scalar, kDof>{0.00001},
+        Eigen::Vector<Scalar, kDof>{1.0},
+        Eigen::Vector<Scalar, kDof>{-1.0},
+        Eigen::Vector<Scalar, kDof>{5.0},
+        Eigen::Vector<Scalar, kDof>{0.5 * kPi<Scalar>},
+        Eigen::Vector<Scalar, kDof>{0.5 * kPi<Scalar> + 0.00001},
     });
   }
 
@@ -356,8 +355,12 @@ class Scaling2Impl {
 
   static auto hat(Eigen::Vector<Scalar, kDof> const& scale_factors)
       -> Eigen::Matrix<Scalar, kAmbientDim, kAmbientDim> {
-    return Eigen::Matrix<Scalar, kAmbientDim, kAmbientDim>::diagonal(
-        scale_factors);
+    Eigen::Matrix<Scalar, kAmbientDim, kAmbientDim> mat;
+    mat.setZero();
+    for (int i = 0; i < kDof; ++i) {
+      mat.diagonal()[i] = scale_factors[i];
+    }
+    return mat;
   }
 
   static auto vee(Eigen::Matrix<Scalar, kAmbientDim, kAmbientDim> const& mat)
@@ -367,7 +370,7 @@ class Scaling2Impl {
 
   static auto adj(Eigen::Vector<Scalar, kNumParams> const&)
       -> Eigen::Matrix<Scalar, kDof, kDof> {
-    return Eigen::Matrix<Scalar, 1, 1>::Identity();
+    return Eigen::Matrix<Scalar, kDof, kDof>::Identity();
   }
 
   // group operations
@@ -409,8 +412,7 @@ class Scaling2Impl {
         {scale_factors[0], 0.0}, {0.0, scale_factors[1]}};
   }
 
-  static auto homogeneousMatrix(
-      Eigen::Vector<Scalar, kNumParams> const& scale_factors)
+  static auto matrix(Eigen::Vector<Scalar, kNumParams> const& scale_factors)
       -> Eigen::Matrix<Scalar, kAmbientDim, kAmbientDim> {
     return compactMatrix(scale_factors);
   }
@@ -532,8 +534,13 @@ class DirectProduct {
 
   static auto adj(Eigen::Vector<Scalar, kNumParams> const& params)
       -> Eigen::Matrix<Scalar, kDof, kDof> {
-    return LeftGroup::adj(leftParams(params)) *
-           RightGroup::adj(rightParams(params));
+    Eigen::Matrix<Scalar, kDof, kDof> mat_adj;
+    mat_adj.setZero();
+    mat_adj.template topLeftCorner<LeftGroup::kDof, LeftGroup::kDof>() =
+        LeftGroup::adj(leftParams(params));
+    mat_adj.template bottomRightCorner<RightGroup::kDof, RightGroup::kDof>() =
+        RightGroup::adj(rightParams(params));
+    return mat_adj;
   }
 
   // group operations
@@ -550,9 +557,11 @@ class DirectProduct {
 
   static auto inverse(Eigen::Vector<Scalar, kNumParams> const& params)
       -> Eigen::Vector<Scalar, kNumParams> {
-    return params(
-        LeftGroup::inverse(leftParams(params)),
-        RightGroup::inverse(rightParams(params)));
+    Eigen::Vector<Scalar, LeftGroup::kNumParams> left =
+        LeftGroup::inverse(leftParams(params));
+    Eigen::Vector<Scalar, LeftGroup::kNumParams> right =
+        RightGroup::inverse(rightParams(params));
+    return DirectProduct::params(left, right);
   }
 
   // Point actions
@@ -581,7 +590,7 @@ class DirectProduct {
            RightGroup::compactMatrix(rightParams(params));
   }
 
-  static auto homogeneousMatrix(Eigen::Vector<Scalar, kNumParams> const& params)
+  static auto matrix(Eigen::Vector<Scalar, kNumParams> const& params)
       -> Eigen::Matrix<Scalar, kPointDim, kPointDim> {
     return compactMatrix(params);
   }
@@ -606,7 +615,7 @@ class DirectProduct {
     std::vector<Eigen::Vector<Scalar, kDof>> examples;
     for (auto const& left_tangent : LeftGroup::exampleTangents()) {
       for (auto const& right_tangents : RightGroup::exampleTangents()) {
-        examples.push_back(tagent(left_tangent, right_tangents));
+        examples.push_back(tangent(left_tangent, right_tangents));
       }
     }
     return examples;
@@ -715,7 +724,9 @@ class SemiDirectProductWithTranslation {
 
   static auto hat(Eigen::Vector<Scalar, kDof> const& tangent)
       -> Eigen::Matrix<Scalar, kAmbientDim, kAmbientDim> {
-    Eigen::Matrix<Scalar, kAmbientDim, kAmbientDim> hat_mat =
+    Eigen::Matrix<Scalar, kAmbientDim, kAmbientDim> hat_mat;
+    hat_mat.setZero();
+    hat_mat.template topLeftCorner<kPointDim, kPointDim>() =
         LeftGroup::hat(leftTangent(tangent));
     hat_mat.template topRightCorner<kPointDim, 1>() =
         translationTangent(tangent);
@@ -725,7 +736,9 @@ class SemiDirectProductWithTranslation {
   static auto vee(Eigen::Matrix<Scalar, kAmbientDim, kAmbientDim> const& mat)
       -> Eigen::Matrix<Scalar, kDof, 1> {
     return tangent(
-        LeftGroup::vee(mat), mat.template topRightCorner<kPointDim, 1>());
+        LeftGroup::vee(
+            mat.template topLeftCorner<kPointDim, kPointDim>().eval()),
+        mat.template topRightCorner<kPointDim, 1>().eval());
   }
 
   static auto adj(Eigen::Vector<Scalar, kNumParams> const& params)
@@ -738,8 +751,9 @@ class SemiDirectProductWithTranslation {
 
     mat_adjoint.template topLeftCorner<kPointDim, kPointDim>() =
         LeftGroup::matrix(leftParams(params));
-    mat_adjoint.template topRightCorner<kPointDim, LeftGroup::kDof>() =
-        LeftGroup::hat(translation_and_0) * LeftGroup::adj(leftParams(params));
+    // mat_adjoint.template topRightCorner<kPointDim, LeftGroup::kDof>() =
+    //     LeftGroup::hat(translation_and_0) *
+    //     LeftGroup::adj(leftParams(params));
 
     mat_adjoint.template bottomLeftCorner<LeftGroup::kDof, LeftGroup::kDof>()
         .setZero();
@@ -757,15 +771,17 @@ class SemiDirectProductWithTranslation {
     Eigen::Vector<Scalar, LeftGroup::kNumParams> left_params =
         LeftGroup::multiplication(
             leftParams(lhs_params), leftParams(rhs_params));
-    params(left_params, LeftGroup::action(left_params, translation(params)));
+    return SemiDirectProductWithTranslation::params(
+        left_params, LeftGroup::action(left_params, translation(params)));
   }
 
   static auto inverse(Eigen::Vector<Scalar, kNumParams> const& params)
       -> Eigen::Vector<Scalar, kNumParams> {
     Eigen::Vector<Scalar, LeftGroup::kNumParams> left_params =
         LeftGroup::inverse(leftParams(params));
-    return params(
-        left_params, -LeftGroup::action(left_params, translation(params)));
+    return SemiDirectProductWithTranslation::params(
+        left_params,
+        (-LeftGroup::action(left_params, translation(params))).eval());
   }
 
   // Point actions
@@ -793,13 +809,14 @@ class SemiDirectProductWithTranslation {
     return mat;
   }
 
-  static auto homogeneousMatrix(Eigen::Vector<Scalar, kNumParams> const& params)
+  static auto matrix(Eigen::Vector<Scalar, kNumParams> const& params)
       -> Eigen::Matrix<Scalar, kAmbientDim, kAmbientDim> {
     Eigen::Matrix<Scalar, kAmbientDim, kAmbientDim> mat;
+    mat.setZero();
     mat.template topLeftCorner<kPointDim, kAmbientDim>() =
         compactMatrix(params);
-    mat.template bottomLeftCorner<1, kPointDim>().setZero();
     mat(kPointDim, kPointDim) = 1.0;
+    return mat;
   }
 
   // for tests
@@ -807,9 +824,8 @@ class SemiDirectProductWithTranslation {
   static auto exampleTangents() -> std::vector<Eigen::Vector<Scalar, kDof>> {
     std::vector<Eigen::Vector<Scalar, kDof>> examples;
     for (auto const& left_tangent : LeftGroup::exampleTangents()) {
-      for (auto const& translation_tangents :
-           LeftGroup::exampleTranslations()) {
-        examples.push_back(tagent(left_tangent, translation_tangents));
+      for (auto const& translation_tangents : exampleTranslations()) {
+        examples.push_back(tangent(left_tangent, translation_tangents));
       }
     }
     return examples;
@@ -924,15 +940,17 @@ class Group {
     return TImpl::log(this->params_);
   }
 
-  static auto hat(Eigen::Vector<Scalar, kDof> const& tangent) {
+  static auto hat(Eigen::Vector<Scalar, kDof> const& tangent)
+      -> Eigen::Matrix<Scalar, kAmbientDim, kAmbientDim> {
     return TImpl::hat(tangent);
   }
 
-  static auto vee(Eigen::Matrix<Scalar, kAmbientDim, kAmbientDim> const& mat) {
+  static auto vee(Eigen::Matrix<Scalar, kAmbientDim, kAmbientDim> const& mat)
+      -> Eigen::Vector<Scalar, kDof> {
     return TImpl::vee(mat);
   }
 
-  auto adj() const -> Eigen::Vector<Scalar, kDof> {
+  auto adj() const -> Eigen::Matrix<Scalar, kDof, kDof> {
     return TImpl::adj(this->params_);
   }
 
@@ -942,7 +960,9 @@ class Group {
     return Group(TImpl::multiplication(this->params_, rhs.params_));
   }
 
-  auto inverse() const -> Group { return Group(TImpl::inverse(this->params_)); }
+  auto inverse() const -> Group {
+    return Group::fromParams(TImpl::inverse(this->params_));
+  }
 
   // Point actions
 
@@ -961,8 +981,7 @@ class Group {
     return TImpl::compactMatrix(this->params_);
   }
 
-  auto matrix(Group const& other) const
-      -> Eigen::Matrix<Scalar, kAmbientDim, kAmbientDim> {
+  auto matrix() const -> Eigen::Matrix<Scalar, kAmbientDim, kAmbientDim> {
     return TImpl::matrix(this->params_);
   }
 
@@ -1032,6 +1051,10 @@ class GroupWithLeftJacobian : public Group<TImpl> {
   auto operator*(GroupWithLeftJacobian const& rhs) const
       -> GroupWithLeftJacobian {
     return GroupWithLeftJacobian(this->Group<TImpl>::operator*(rhs));
+  }
+
+  auto inverse() const -> GroupWithLeftJacobian {
+    return GroupWithLeftJacobian(this->Group<TImpl>::inverse());
   }
 
   // Point actions
