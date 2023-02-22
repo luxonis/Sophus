@@ -29,13 +29,15 @@ Eigen::Vector2<typename TPoint::Scalar> proj(
 /// Maps point on the z=1 plane (a,b) to homogeneous representation of the same
 /// point: (z*a, z*b, z). Z defaults to 1.
 template <class TPoint>
-Eigen::Vector3<typename TPoint::Scalar> unproj(
-    Eigen::MatrixBase<TPoint> const& p,
-    const typename TPoint::Scalar& z = 1.0) {
+auto unproj(
+    Eigen::MatrixBase<TPoint> const& p, const typename TPoint::Scalar& z = 1.0)
+    -> Eigen::Vector<typename TPoint::Scalar, TPoint::RowsAtCompileTime + 1> {
   using Scalar = typename TPoint::Scalar;
   static_assert(TPoint::ColsAtCompileTime == 1, "p must be a column-vector");
-  static_assert(TPoint::RowsAtCompileTime == 2, "p must have exactly 2 rows");
-  return Eigen::Vector3<Scalar>(z * p.x(), z * p.y(), z);
+  Eigen::Vector<Scalar, TPoint::RowsAtCompileTime + 1> out;
+  out.template head<TPoint::RowsAtCompileTime>() = z * p;
+  out[TPoint::RowsAtCompileTime] = z;
+  return out;
 }
 
 }  // namespace sophus

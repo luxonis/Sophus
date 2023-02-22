@@ -35,10 +35,12 @@ void adjointTest(std::string group_name) {
           ad2,
           0.001,
           "adjointTest {}\n"
+          "Adj: {}"
           "tangent # {} ({})\n"
           "params # {} ({}); matrix:\n"
           "{}",
           group_name,
+          ad,
           tangent_id,
           x.transpose(),
           params_id,
@@ -48,46 +50,45 @@ void adjointTest(std::string group_name) {
   }
 }
 
-// // implemented for So3 and Se3
-// template <class G>
-// void leftJacobianTest(std::string group_name) {
-//   using Scalar = typename G::Scalar;
-//   Scalar const small_eps_sqrt = kEpsilonSqrt<Scalar>;
+template <class G>
+void leftJacobianTest(std::string group_name) {
+  using Scalar = typename G::Scalar;
+  Scalar const small_eps_sqrt = kEpsilonSqrt<Scalar>;
 
-//   for (size_t tangent_id = 0; tangent_id < G::exampleTangents().size();
-//        ++tangent_id) {
-//     auto x = G::exampleTangents()[tangent_id];
-//     G const inv_exp_x = G::exp(x).inverse();
+  for (size_t tangent_id = 0; tangent_id < G::exampleTangents().size();
+       ++tangent_id) {
+    auto x = G::exampleTangents()[tangent_id];
+    G const inv_exp_x = G::exp(x).inverse();
 
-//     // Explicit implement the derivative in the Lie Group in first principles
-//     // as a vector field: D_x f(x) = D_h log(f(x + h) . f(x)^{-1})
-//     Eigen::Matrix<Scalar, G::kDof, G::kDof> const j_num =
-//         vectorFieldNumDiff<Scalar, G::kDof, G::kDof>(
-//             [&inv_exp_x](auto const& x_plus_delta) {
-//               return (G::exp(x_plus_delta) * inv_exp_x).log();
-//             },
-//             x);
+    // Explicit implement the derivative in the Lie Group in first principles
+    // as a vector field: D_x f(x) = D_h log(f(x + h) . f(x)^{-1})
+    Eigen::Matrix<Scalar, G::kDof, G::kDof> const j_num =
+        vectorFieldNumDiff<Scalar, G::kDof, G::kDof>(
+            [&inv_exp_x](auto const& x_plus_delta) {
+              return (G::exp(x_plus_delta) * inv_exp_x).log();
+            },
+            x);
 
-//     // Analytical left Jacobian
-//     Eigen::Matrix<Scalar, G::kDof, G::kDof> const j = G::leftJacobian(x);
-//     FARM_ASSERT_NEAR(
-//         j,
-//         j_num,
-//         Scalar(100) * small_eps_sqrt,
-//         "leftJacobianTest #1: {}",
-//         group_name);
+    // Analytical left Jacobian
+    Eigen::Matrix<Scalar, G::kDof, G::kDof> const j = G::exp(x).leftJacobian();
+    FARM_ASSERT_NEAR(
+        j,
+        j_num,
+        Scalar(100) * small_eps_sqrt,
+        "leftJacobianTest #1: {}",
+        group_name);
 
-//     Eigen::Matrix<Scalar, G::kDof, G::kDof> j_inv =
-//     G::leftJacobianInverse(x);
+    // Eigen::Matrix<Scalar, G::kDof, G::kDof> j_inv =
+    // G::leftJacobianInverse(x);
 
-//     FARM_ASSERT_NEAR(
-//         j,
-//         j_inv.inverse().eval(),
-//         Scalar(100) * small_eps_sqrt,
-//         "leftJacobianTest #2: {}",
-//         group_name);
-//   }
-// }
+    // FARM_ASSERT_NEAR(
+    //     j,
+    //     j_inv.inverse().eval(),
+    //     Scalar(100) * small_eps_sqrt,
+    //     "leftJacobianTest #2: {}",
+    //     group_name);
+  }
+}
 
 //  bool moreJacobiansTest() {
 //     bool passed = true;
@@ -434,36 +435,42 @@ void groupActionTest(
 //     return passed;
 //   }
 
-//   bool lieBracketTest() {
-//     bool passed = true;
-//     for (size_t i = 0; i < tangent_vec_.size(); ++i) {
-//       for (size_t j = 0; j < tangent_vec_.size(); ++j) {
-//         Tangent tangent1 =
-//             LieGroup::lieBracket(tangent_vec_[i], tangent_vec_[j]);
-//         Transformation hati = LieGroup::hat(tangent_vec_[i]);
-//         Transformation hatj = LieGroup::hat(tangent_vec_[j]);
+// template <class G>
+// bool lieBracketTest(std::string group_name) {
+//   for (size_t i = 0; i < tangent_vec_.size(); ++i) {
+//     for (size_t j = 0; j < tangent_vec_.size(); ++j) {
+//       Tangent tangent1 = LieGroup::lieBracket(tangent_vec_[i],
+//       tangent_vec_[j]); Transformation hati = LieGroup::hat(tangent_vec_[i]);
+//       Transformation hatj = LieGroup::hat(tangent_vec_[j]);
 
-//         Tangent tangent2 = LieGroup::vee(hati * hatj - hatj * hati);
-//         SOPHUS_TEST_APPROX(
-//             passed, tangent1, tangent2, small_eps, "Lie Bracket case: %", i);
-//       }
-//     }
-//     return passed;
-//   }
-
-//   bool veeHatTest() {
-//     bool passed = true;
-//     for (size_t i = 0; i < tangent_vec_.size(); ++i) {
-//       SOPHUS_TEST_APPROX(
+//       Tangent tangent2 = LieGroup::vee(hati * hatj - hatj * hati);
+//       FARM_ASSERT_NEAR(
 //           passed,
-//           Tangent(tangent_vec_[i]),
-//           LieGroup::vee(LieGroup::hat(tangent_vec_[i])),
+//           tangent1,
+//           tangent2,
 //           small_eps,
-//           "Hat-vee case: %",
-//           i);
+//           "lieBracketTest {}",
+//           group_name);
 //     }
-//     return passed;
 //   }
+// }
+
+template <class G>
+bool veeHatTest(std::string group_name) {
+  bool passed = true;
+  for (size_t i = 0; i < G::exampleTangents().size(); ++i) {
+    auto tangent = G::exampleTangents()[i];
+    FARM_ASSERT_NEAR(
+        tangent,
+        G::vee(G::hat(tangent)),
+        0.0001,
+        "veeHatTest {}, tangent #{}: {}",
+        group_name,
+        i,
+        tangent.transpose());
+  }
+  return passed;
+}
 
 //   bool newDeleteSmokeTest() {
 //     bool passed = true;
@@ -700,7 +707,6 @@ void groupActionTest(
 //             dt_parent_t_spline2,
 //             100 * small_eps_sqrt,
 //             "Dt_parent_T_spline");
-
 //         Transformation dt2_parent_t_spline =
 //             spline.dt2ParentFromSpline(0.0, 0.5);
 //         Transformation dt2_parent_t_spline2 = curveNumDiff(
@@ -753,16 +759,23 @@ void groupActionTest(
 //   }
 
 template <class G>
-void tests(
+void lieGroupPropTests(
     std::string group_name,
     std::vector<Eigen::Vector<typename G::Scalar, G::kPointDim>> const&
         point_vec) {
   expLogTest<G>(group_name);
-  adjointTest<G>(group_name);
-
+  // adjointTest<G>(group_name);
   groupActionTest<G>(group_name, point_vec);
+  veeHatTest<G>(group_name);
+}
 
-  // leftJacobianTest<G>(group_name);
+template <class G>
+void leftJacobianPropTests(
+    std::string group_name,
+    std::vector<Eigen::Vector<typename G::Scalar, G::kPointDim>> const&
+        point_vec) {
+  lieGroupPropTests<G>(group_name, point_vec);
+  leftJacobianTest<G>(group_name);
 }
 
 template <class Scalar>
@@ -771,12 +784,14 @@ void testAllGroups2() {
   point_vec.push_back(Eigen::Vector<Scalar, 2>(Scalar(1), Scalar(2)));
   point_vec.push_back(Eigen::Vector<Scalar, 2>(Scalar(1), Scalar(-3)));
 
-  tests<sophus::Rotation2<Scalar>>("Rotation(2)", point_vec);
-  tests<sophus::Scaling2<Scalar>>("Scaling(2)", point_vec);
-  // tests<sophus::ScalingRotation2<Scalar>>("ScalingRotation(2)", point_vec);
-  // tests<sophus::Isometry2<Scalar>>("Isometry(2)", point_vec);
-  // tests<sophus::ScalingTranslation2<Scalar>>("ScalingTranslation",
-  // point_vec);
+  leftJacobianPropTests<sophus::Rotation2<Scalar>>("Rotation(2)", point_vec);
+  leftJacobianPropTests<sophus::Scaling2<Scalar>>("Scaling(2)", point_vec);
+  //leftJacobianPropTests<sophus::ScalingRotation2<Scalar>>(
+    //  "ScalingRotation(2)", point_vec);
+       
+  lieGroupPropTests<sophus::Isometry2<Scalar>>("Isometry(2)", point_vec);
+  lieGroupPropTests<sophus::ScalingTranslation2<Scalar>>(
+      "ScalingTranslation", point_vec);
 }
 
 TEST(lie_group_concept, unit) { testAllGroups2<double>(); }

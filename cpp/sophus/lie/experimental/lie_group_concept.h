@@ -12,6 +12,8 @@
 #pragma once
 #include "sophus/common/concept_utils.h"
 #include "sophus/common/types.h"
+#include "sophus/linalg/homogeneous.h"
+#include "sophus/linalg/skew_symmetric.h"
 
 namespace sophus {
 namespace lie {
@@ -22,113 +24,112 @@ concept LieGroupImplConcept =
     (T::kPointDim == T::kAmbientDim  // inhomogeneous point representation
      ||
      T::kPointDim + 1 == T::kAmbientDim)  // or homogeneous point representation
-    && requires(
-           T g,
-           Eigen::Vector<typename T::Scalar, T::kDof> tangent,
-           Eigen::Vector<typename T::Scalar, T::kPointDim> point,
-           Eigen::Vector<typename T::Scalar, T::kNumParams> params,
-           Eigen::Matrix<typename T::Scalar, T::kAmbientDim, T::kAmbientDim>
-               matrix,
-           Eigen::Matrix<typename T::Scalar, T::kDof, T::kDof> adjoint) {
-  // constructors and factories
-  {
-    T::identityParams()
-    } -> ConvertibleTo<Eigen::Vector<typename T::Scalar, T::kNumParams>>;
+    &&
+    requires(
+        T g,
+        Eigen::Vector<typename T::Scalar, T::kDof> tangent,
+        Eigen::Vector<typename T::Scalar, T::kPointDim> point,
+        Eigen::Vector<typename T::Scalar, T::kNumParams> params,
+        Eigen::Matrix<typename T::Scalar, T::kAmbientDim, T::kAmbientDim>
+            matrix,
+        Eigen::Matrix<typename T::Scalar, T::kDof, T::kDof> adjoint) {
+      // constructors and factories
+      {
+        T::identityParams()
+        } -> ConvertibleTo<Eigen::Vector<typename T::Scalar, T::kNumParams>>;
 
-  { T::areParamsValid(params) } -> ConvertibleTo<sophus::Expected<Success>>;
+      { T::areParamsValid(params) } -> ConvertibleTo<sophus::Expected<Success>>;
 
-  // Manifold / Lie Group concepts
+      // Manifold / Lie Group concepts
 
-  {
-    T::exp(tangent)
-    } -> ConvertibleTo<Eigen::Vector<typename T::Scalar, T::kNumParams>>;
+      {
+        T::exp(tangent)
+        } -> ConvertibleTo<Eigen::Vector<typename T::Scalar, T::kNumParams>>;
 
-  {
-    T::log(params)
-    } -> ConvertibleTo<Eigen::Vector<typename T::Scalar, T::kDof>>;
+      {
+        T::log(params)
+        } -> ConvertibleTo<Eigen::Vector<typename T::Scalar, T::kDof>>;
 
-  {
-    T::hat(tangent)
-    } -> ConvertibleTo<
-        Eigen::Matrix<typename T::Scalar, T::kAmbientDim, T::kAmbientDim>>;
+      {
+        T::hat(tangent)
+        } -> ConvertibleTo<
+            Eigen::Matrix<typename T::Scalar, T::kAmbientDim, T::kAmbientDim>>;
 
-  {
-    T::vee(matrix)
-    } -> ConvertibleTo<Eigen::Vector<typename T::Scalar, T::kDof>>;
+      {
+        T::vee(matrix)
+        } -> ConvertibleTo<Eigen::Vector<typename T::Scalar, T::kDof>>;
 
-  {
-    T::adj(params)
-    } -> ConvertibleTo<Eigen::Matrix<typename T::Scalar, T::kDof, T::kDof>>;
+      {
+        T::adj(params)
+        } -> ConvertibleTo<Eigen::Matrix<typename T::Scalar, T::kDof, T::kDof>>;
 
-  // group operations
-  {
-    T::multiplication(params, params)
-    } -> ConvertibleTo<Eigen::Vector<typename T::Scalar, T::kNumParams>>;
+      // group operations
+      {
+        T::multiplication(params, params)
+        } -> ConvertibleTo<Eigen::Vector<typename T::Scalar, T::kNumParams>>;
 
-  {
-    T::inverse(params)
-    } -> ConvertibleTo<Eigen::Vector<typename T::Scalar, T::kNumParams>>;
+      {
+        T::inverse(params)
+        } -> ConvertibleTo<Eigen::Vector<typename T::Scalar, T::kNumParams>>;
 
-  // Point actions
+      // Point actions
 
-  {
-    T::action(params, point)
-    } -> ConvertibleTo<Eigen::Vector<typename T::Scalar, T::kPointDim>>;
+      {
+        T::action(params, point)
+        } -> ConvertibleTo<Eigen::Vector<typename T::Scalar, T::kPointDim>>;
 
-  {
-    T::toAmbient(point)
-    } -> ConvertibleTo<Eigen::Vector<typename T::Scalar, T::kAmbientDim>>;
+      {
+        T::toAmbient(point)
+        } -> ConvertibleTo<Eigen::Vector<typename T::Scalar, T::kAmbientDim>>;
 
-  // Matrices
+      // Matrices
 
-  {
-    T::compactMatrix(params)
-    } -> ConvertibleTo<
-        Eigen::Matrix<typename T::Scalar, T::kPointDim, T::kAmbientDim>>;
+      {
+        T::compactMatrix(params)
+        } -> ConvertibleTo<
+            Eigen::Matrix<typename T::Scalar, T::kPointDim, T::kAmbientDim>>;
 
-  {
-    T::matrix(params)
-    } -> ConvertibleTo<
-        Eigen::Matrix<typename T::Scalar, T::kAmbientDim, T::kAmbientDim>>;
+      {
+        T::matrix(params)
+        } -> ConvertibleTo<
+            Eigen::Matrix<typename T::Scalar, T::kAmbientDim, T::kAmbientDim>>;
 
-  // for tests
-  {
-    T::exampleTangents()
-    } -> ConvertibleTo<std::vector<Eigen::Vector<typename T::Scalar, T::kDof>>>;
+      // for tests
+      {
+        T::exampleTangents()
+        } -> ConvertibleTo<
+            std::vector<Eigen::Vector<typename T::Scalar, T::kDof>>>;
 
-  {
-    T::exampleParams()
-    } -> ConvertibleTo<
-        std::vector<Eigen::Vector<typename T::Scalar, T::kNumParams>>>;
-};
+      {
+        T::exampleParams()
+        } -> ConvertibleTo<
+            std::vector<Eigen::Vector<typename T::Scalar, T::kNumParams>>>;
+    };
 
 template <class T>
-concept LeftJacobianImplConcept = LieGroupImplConcept<T> &&
-    requires(T g, Eigen::Vector<typename T::Scalar, T::kNumParams> params) {
-  {
-    T::leftJacobian(params)
-    } -> ConvertibleTo<
-        Eigen::Matrix<typename T::Scalar, T::kPointDim, T::kPointDim>>;
+concept LeftJacobianImplConcept =
+    LieGroupImplConcept<T> &&
+    requires(
+        T g,
+        Eigen::Vector<typename T::Scalar, T::kNumParams> params,
+        Eigen::Vector<typename T::Scalar, T::kPointDim> point) {
+      {
+        T::leftJacobian(params)
+        } -> ConvertibleTo<
+            Eigen::Matrix<typename T::Scalar, T::kDof, T::kDof>>;
 
-  {
-    T::leftJacobianInverse(params)
-    } -> ConvertibleTo<
-        Eigen::Matrix<typename T::Scalar, T::kPointDim, T::kPointDim>>;
-};
+      {
+        T::leftJacobianInverse(params)
+        } -> ConvertibleTo<
+            Eigen::Matrix<typename T::Scalar, T::kDof, T::kDof>>;
+
+      {
+        T::topRightAdj(params, point)
+        } -> ConvertibleTo<
+            Eigen::Matrix<typename T::Scalar, T::kPointDim, T::kDof>>;
+    };
 
 // TODO: harmonize with the implementation in geometry.
-
-template <class TPoint>
-auto unproj(
-    Eigen::MatrixBase<TPoint> const& p, const typename TPoint::Scalar& z = 1.0)
-    -> Eigen::Vector<typename TPoint::Scalar, TPoint::RowsAtCompileTime + 1> {
-  using Scalar = typename TPoint::Scalar;
-  static_assert(TPoint::ColsAtCompileTime == 1, "p must be a column-vector");
-  Eigen::Vector<Scalar, TPoint::RowsAtCompileTime + 1> out;
-  out.template head<TPoint::RowsAtCompileTime>() = z * p;
-  out[TPoint::RowsAtCompileTime] = z;
-  return out;
-}
 
 template <class TScalar>
 class Rotation2Impl {
@@ -148,7 +149,7 @@ class Rotation2Impl {
   static auto areParamsValid(
       Eigen::Vector<Scalar, kNumParams> const& unit_complex)
       -> sophus::Expected<Success> {
-    static const Scalar kThr = kEpsilon<Scalar> * kEpsilon<Scalar>;
+    static const Scalar kThr = kEpsilon<Scalar>;
     const Scalar squared_norm = unit_complex.squaredNorm();
     using std::abs;
     if (!(abs(squared_norm - 1.0) <= kThr)) {
@@ -191,6 +192,13 @@ class Rotation2Impl {
   static auto adj(Eigen::Vector<Scalar, kNumParams> const&)
       -> Eigen::Matrix<Scalar, kDof, kDof> {
     return Eigen::Matrix<Scalar, 1, 1>::Identity();
+  }
+
+  static auto topRightAdj(
+      Eigen::Vector<Scalar, kNumParams> const&,
+      Eigen::Vector<Scalar, kPointDim> const& point)
+      -> Eigen::Matrix<Scalar, kPointDim, kDof> {
+    return Eigen::Matrix<Scalar, 2, 1>(point[1], -point[0]);
   }
 
   // group operations
@@ -272,13 +280,13 @@ class Rotation2Impl {
   // left Jacobian
 
   static auto leftJacobian(Eigen::Vector<Scalar, kNumParams> const&)
-      -> Eigen::Matrix<Scalar, kPointDim, kPointDim> {
-    return Eigen::Matrix<Scalar, kPointDim, kPointDim>::Identity();
+      -> Eigen::Matrix<Scalar, kDof, kDof> {
+    return Eigen::Matrix<Scalar, kDof, kDof>::Identity();
   }
 
   static auto leftJacobianInverse(Eigen::Vector<Scalar, kNumParams> const&)
-      -> Eigen::Matrix<Scalar, kPointDim, kPointDim> {
-    return Eigen::Matrix<Scalar, kPointDim, kPointDim>::Identity();
+      -> Eigen::Matrix<Scalar, kDof, kDof> {
+    return Eigen::Matrix<Scalar, kDof, kDof>::Identity();
   }
 
   // for tests
@@ -420,13 +428,20 @@ class Scaling2Impl {
   // left Jacobian
 
   static auto leftJacobian(Eigen::Vector<Scalar, kNumParams> const&)
-      -> Eigen::Matrix<Scalar, kPointDim, kPointDim> {
-    return Eigen::Matrix<Scalar, kPointDim, kPointDim>::Identity();
+      -> Eigen::Matrix<Scalar, kDof, kDof> {
+    return Eigen::Matrix<Scalar, kDof, kDof>::Identity();
   }
 
   static auto leftJacobianInverse(Eigen::Vector<Scalar, kNumParams> const&)
-      -> Eigen::Matrix<Scalar, kPointDim, kPointDim> {
-    return Eigen::Matrix<Scalar, kPointDim, kPointDim>::Identity();
+      -> Eigen::Matrix<Scalar, kDof, kDof> {
+    return Eigen::Matrix<Scalar, kDof, kDof>::Identity();
+  }
+
+  static auto topRightAdj(
+      Eigen::Vector<Scalar, kNumParams> const&,
+      Eigen::Vector<Scalar, kPointDim> const& point)
+      -> Eigen::Matrix<Scalar, kPointDim, kDof> {
+    return Eigen::Matrix<Scalar, 2, 2>::Identity();
   }
 
   // for tests
@@ -456,8 +471,8 @@ template <
     class TLeftGroup,
     template <class>
     class TRightGroup>
-requires LieGroupImplConcept<TLeftGroup<TScalar>> &&
-    LieGroupImplConcept<TRightGroup<TScalar>>
+  requires LieGroupImplConcept<TLeftGroup<TScalar>> &&
+           LieGroupImplConcept<TRightGroup<TScalar>>
 class DirectProduct {
  public:
   using Scalar = TScalar;
@@ -543,6 +558,19 @@ class DirectProduct {
     return mat_adj;
   }
 
+  static auto topRightAdj(
+      Eigen::Vector<Scalar, kNumParams> const&,
+      Eigen::Vector<Scalar, kPointDim> const& point)
+      -> Eigen::Matrix<Scalar, kPointDim, kDof> {
+    Eigen::Matrix<Scalar, kDof, kDof> mat_adj;
+    mat_adj.setZero();
+    mat_adj.template topLeftCorner<kPointDim, LeftGroup::kDof>() =
+        LeftGroup::topRightAdj(leftParams(params), point);
+    mat_adj.template bottomRightCorner<kPointDim, RightGroup::kDof>() =
+        RightGroup::topRightAdj(rightParams(params), point);
+    return mat_adj;
+  }
+
   // group operations
   static auto multiplication(
       Eigen::Vector<Scalar, kNumParams> const& lhs_params,
@@ -598,13 +626,13 @@ class DirectProduct {
   // left jacobian
 
   static auto leftJacobian(Eigen::Vector<Scalar, kNumParams> const&)
-      -> Eigen::Matrix<Scalar, kPointDim, kPointDim> {
+      -> Eigen::Matrix<Scalar, kDof, kDof> {
     return LeftGroup::leftJacobian(leftParams(params)) *
            RightGroup::leftJacobian(rightParams(params));
   }
 
   static auto leftJacobianInverse(Eigen::Vector<Scalar, kNumParams> const&)
-      -> Eigen::Matrix<Scalar, kPointDim, kPointDim> {
+      -> Eigen::Matrix<Scalar, kDof, kDof> {
     return LeftGroup::leftJacobianInverse(leftParams(params)) *
            RightGroup::leftJacobianInverse(rightParams(params));
   }
@@ -675,7 +703,7 @@ class DirectProduct {
 };
 
 template <class TScalar, int kTranslationDim, template <class> class TLeftGroup>
-requires LeftJacobianImplConcept<TLeftGroup<TScalar>>
+  requires LeftJacobianImplConcept<TLeftGroup<TScalar>>
 class SemiDirectProductWithTranslation {
  public:
   using Scalar = TScalar;
@@ -710,7 +738,7 @@ class SemiDirectProductWithTranslation {
         LeftGroup::exp(leftTangent(tangent));
     return params(
         left_params,
-        LeftGroup::leftJacobian(left_params) * translationTangent(tangent));
+        (LeftGroup::leftJacobian(left_params) * translationTangent(tangent)).eval());
   }
 
   static auto log(Eigen::Vector<Scalar, kNumParams> const& params)
@@ -745,20 +773,18 @@ class SemiDirectProductWithTranslation {
       -> Eigen::Matrix<Scalar, kDof, kDof> {
     Eigen::Matrix<Scalar, kDof, kDof> mat_adjoint;
 
-    Eigen::Vector<Scalar, kPointDim + 1> translation_and_0;
-    translation_and_0.template head<kPointDim>() = translation(params);
-    translation_and_0[kPointDim] = 0.0;
+    Eigen::Vector<Scalar, LeftGroup::kNumParams> left_params =
+        leftParams(params);
 
     mat_adjoint.template topLeftCorner<kPointDim, kPointDim>() =
-        LeftGroup::matrix(leftParams(params));
-    // mat_adjoint.template topRightCorner<kPointDim, LeftGroup::kDof>() =
-    //     LeftGroup::hat(translation_and_0) *
-    //     LeftGroup::adj(leftParams(params));
+        LeftGroup::matrix(left_params);
+    mat_adjoint.template topRightCorner<kPointDim, LeftGroup::kDof>() =
+        LeftGroup::topRightAdj(left_params, translation(params));
 
     mat_adjoint.template bottomLeftCorner<LeftGroup::kDof, LeftGroup::kDof>()
         .setZero();
     mat_adjoint.template bottomRightCorner<LeftGroup::kDof, LeftGroup::kDof>() =
-        LeftGroup::adj(leftParams(params));
+        LeftGroup::adj(left_params);
 
     return mat_adjoint;
   }
@@ -1065,13 +1091,13 @@ class GroupWithLeftJacobian : public Group<TImpl> {
 
   // left Jacobian
 
-  auto leftJacobian() const -> Eigen::Matrix<Scalar, kPointDim, kPointDim> {
-    return TImpl::leftJacobian(Group<TImpl>::fromParams(this->params_));
+  auto leftJacobian() const -> Eigen::Matrix<Scalar, kDof, kDof> {
+    return TImpl::leftJacobian(this->params_);
   }
 
   auto leftJacobianInverse(Eigen::Vector<Scalar, kNumParams> const&) const
-      -> Eigen::Matrix<Scalar, kPointDim, kPointDim> {
-    return TImpl::leftJacobianInverse(Group<TImpl>::fromParams(this->params_));
+      -> Eigen::Matrix<Scalar, kDof, kDof> {
+    return TImpl::leftJacobianInverse(this->params_);
   }
 };
 

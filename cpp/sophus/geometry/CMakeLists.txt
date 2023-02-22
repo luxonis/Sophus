@@ -13,7 +13,6 @@ farm_ng_add_library(sophus_geometry
   inverse_depth.h
   plane_conv.h
   point_transform.h
-  projection.h
   unit_vector.h
   ray.h
 )
@@ -25,7 +24,6 @@ if(${BUILD_SOPHUS_TESTS})
     inverse_depth
     plane_conv
     point_transform
-    projection
     unit_vector
     ray)
     farm_ng_add_test(${test_basename}

@@ -63,16 +63,16 @@ class VectorField {
   }
 };
 
-template <class TScalar, int kMatrixDim>
-class VectorField<TScalar, kMatrixDim, 1> {
- public:
-  static Eigen::Matrix<TScalar, kMatrixDim, 1> numDiff(
-      std::function<Eigen::Vector<TScalar, kMatrixDim>(TScalar)> vector_field,
-      TScalar const& a,
-      TScalar eps) {
-    return details::Curve<TScalar>::numDiff(std::move(vector_field), a, eps);
-  }
-};
+// template <class TScalar, int kMatrixDim>
+// class VectorField<TScalar, kMatrixDim, 1> {
+//  public:
+//   static Eigen::Matrix<TScalar, kMatrixDim, 1> numDiff(
+//       std::function<Eigen::Vector<TScalar, kMatrixDim>(TScalar)> vector_field,
+//       TScalar const& a,
+//       TScalar eps) {
+//     return details::Curve<TScalar>::numDiff(std::move(vector_field), a, eps);
+//   }
+// };
 }  // namespace details
 
 /// Calculates the derivative of a curve at a point ``t``.

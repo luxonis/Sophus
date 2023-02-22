@@ -6,6 +6,17 @@
 // license that can be found in the LICENSE file or at
 // https://opensource.org/licenses/MIT.
 
-#include "sophus/geometry/projection.h"
+/// @file
+/// Rotation matrix helper functions.
 
-#include <gtest/gtest.h>
+#pragma once
+
+#include "sophus/common/types.h"
+
+#include <Eigen/Dense>
+#include <Eigen/SVD>
+
+namespace sophus {
+
+
+}  // namespace sophus
