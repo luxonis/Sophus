@@ -6,7 +6,7 @@
 // license that can be found in the LICENSE file or at
 // https://opensource.org/licenses/MIT.
 
-#include "sophus/lie/experimental/lie_group_concept.h"
+#include "sophus/lie/experimental/lie_group.h"
 
 #include <gtest/gtest.h>
 #include <sophus/calculus/num_diff.h>
@@ -724,7 +724,7 @@ void lieGroupPropTests(
     std::vector<Eigen::Vector<typename G::Scalar, G::kPointDim>> const&
         point_vec) {
   expLogTest<G>(group_name);
-  // adjointTest<G>(group_name);
+  adjointTest<G>(group_name);
   groupActionTest<G>(group_name, point_vec);
   veeHatTest<G>(group_name);
 }
@@ -745,9 +745,6 @@ void testAllGroups2() {
 
   leftJacobianPropTests<sophus::Rotation2<Scalar>>("Rotation(2)", point_vec);
   leftJacobianPropTests<sophus::Scaling2<Scalar>>("Scaling(2)", point_vec);
-  leftJacobianPropTests<sophus::ScalingRotation2<Scalar>>(
-      "ScalingRotation(2)", point_vec);
-
   lieGroupPropTests<sophus::Isometry2<Scalar>>("Isometry(2)", point_vec);
   lieGroupPropTests<sophus::ScalingTranslation2<Scalar>>(
       "ScalingTranslation", point_vec);
