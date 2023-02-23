@@ -21,8 +21,8 @@ template <
     class TLeftGroup,
     template <class>
     class TRightGroup>
-  requires LieGroupImplConcept<TLeftGroup<TScalar>> &&
-           LieGroupImplConcept<TRightGroup<TScalar>>
+requires LieGroupImplConcept<TLeftGroup<TScalar>> &&
+    LieGroupImplConcept<TRightGroup<TScalar>>
 class DirectProduct {
  public:
   using Scalar = TScalar;

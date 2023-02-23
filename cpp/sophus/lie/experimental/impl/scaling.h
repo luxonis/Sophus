@@ -175,11 +175,11 @@ class ScalingImpl {
            Eigen::Vector<Scalar, kNumParams>({5.0, 1.237})});
     } else {
       if constexpr (kPointDim == 3) {
-       return std::vector<Eigen::Vector<Scalar, kNumParams>>(
-          {Eigen::Vector<Scalar, kNumParams>({1.0, 1.0, 1.0}),
-           Eigen::Vector<Scalar, kNumParams>({1.0, 2.0, 1.05}),
-           Eigen::Vector<Scalar, kNumParams>({1.5, 1.0, 2.8}),
-           Eigen::Vector<Scalar, kNumParams>({5.0, 1.237, 2})});
+        return std::vector<Eigen::Vector<Scalar, kNumParams>>(
+            {Eigen::Vector<Scalar, kNumParams>({1.0, 1.0, 1.0}),
+             Eigen::Vector<Scalar, kNumParams>({1.0, 2.0, 1.05}),
+             Eigen::Vector<Scalar, kNumParams>({1.5, 1.0, 2.8}),
+             Eigen::Vector<Scalar, kNumParams>({5.0, 1.237, 2})});
       }
     }
   }

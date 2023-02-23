@@ -729,7 +729,6 @@ void lieGroupPropTests(
   veeHatTest<G>(group_name);
 }
 
-
 template <class Scalar>
 void testAllGroups2() {
   std::vector<Eigen::Vector<Scalar, 2>> point_vec;
