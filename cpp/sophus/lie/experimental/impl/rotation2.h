@@ -16,9 +16,33 @@ namespace sophus {
 namespace lie {
 
 template <class TScalar>
+class ComplexNumberImpl {
+ public:
+  using Scalar = TScalar;
+
+  static auto multiplication(
+      Eigen::Vector<Scalar, 2> const& lhs_real_imag,
+      Eigen::Vector<Scalar, 2> const& rhs_real_imag)
+      -> Eigen::Vector<Scalar, 2> {
+    // complex multiplication
+    return Eigen::Vector<Scalar, 2>(
+        lhs_real_imag.x() * rhs_real_imag.x() -
+            lhs_real_imag.y() * rhs_real_imag.y(),
+        lhs_real_imag.x() * rhs_real_imag.y() +
+            lhs_real_imag.y() * rhs_real_imag.x());
+  }
+
+  static auto squaredNorm(Eigen::Vector<Scalar, 2> const& real_imag) -> double {
+    return real_imag.squaredNorm();
+  }
+};
+
+template <class TScalar>
 class Rotation2Impl {
  public:
   using Scalar = TScalar;
+  using Complex = ComplexNumberImpl<TScalar>;
+
   static int const kDof = 1;
   static int const kNumParams = 2;
   static int const kPointDim = 2;
@@ -90,17 +114,9 @@ class Rotation2Impl {
       Eigen::Vector<Scalar, kNumParams> const& lhs_params,
       Eigen::Vector<Scalar, kNumParams> const& rhs_params)
       -> Eigen::Vector<Scalar, kNumParams> {
-    Scalar const lhs_real = lhs_params.x();
-    Scalar const lhs_imag = lhs_params.y();
-    Scalar const rhs_real = rhs_params.x();
-    Scalar const rhs_imag = rhs_params.y();
+    auto result = Complex::multiplication(lhs_params, rhs_params);
+    Scalar const squared_norm = result.squaredNorm();
 
-    // complex multiplication
-    Scalar const result_real = lhs_real * rhs_real - lhs_imag * rhs_imag;
-    Scalar const result_imag = lhs_real * rhs_imag + lhs_imag * rhs_real;
-
-    Scalar const squared_norm =
-        result_real * result_real + result_imag * result_imag;
     // We can assume that the squared-norm is close to 1 since we deal with a
     // unit complex number. Due to numerical precision issues, there might
     // be a small drift after pose concatenation. Hence, we need to renormalizes
@@ -110,10 +126,9 @@ class Rotation2Impl {
     // http://stackoverflow.com/a/12934750 for details).
     if (squared_norm != 1.0) {
       Scalar const scale = 2.0 / (1.0 + squared_norm);
-      return Eigen::Vector<Scalar, kNumParams>(
-          result_real * scale, result_imag * scale);
+      return scale * result;
     }
-    return Eigen::Vector<Scalar, kNumParams>(result_real, result_imag);
+    return result;
   }
 
   // Point actions
@@ -121,17 +136,7 @@ class Rotation2Impl {
       Eigen::Vector<Scalar, kNumParams> const& unit_complex,
       Eigen::Vector<Scalar, kPointDim> const& point)
       -> Eigen::Vector<Scalar, kPointDim> {
-    Eigen::Vector<Scalar, kPointDim> out;
-    Scalar const lhs_real = unit_complex.x();
-    Scalar const lhs_imag = unit_complex.y();
-    Scalar const rhs_real = point.x();
-    Scalar const rhs_imag = point.y();
-
-    // complex multiplication
-    out[0] = lhs_real * rhs_real - lhs_imag * rhs_imag;
-    out[1] = lhs_real * rhs_imag + lhs_imag * rhs_real;
-
-    return out;
+    return Complex::multiplication(unit_complex, point);
   }
 
   static auto toAmbient(Eigen::Vector<Scalar, kPointDim> const& point)
