@@ -67,9 +67,8 @@ class VectorField {
 // class VectorField<TScalar, kMatrixDim, 1> {
 //  public:
 //   static Eigen::Matrix<TScalar, kMatrixDim, 1> numDiff(
-//       std::function<Eigen::Vector<TScalar, kMatrixDim>(TScalar)> vector_field,
-//       TScalar const& a,
-//       TScalar eps) {
+//       std::function<Eigen::Vector<TScalar, kMatrixDim>(TScalar)>
+//       vector_field, TScalar const& a, TScalar eps) {
 //     return details::Curve<TScalar>::numDiff(std::move(vector_field), a, eps);
 //   }
 // };

@@ -16,7 +16,4 @@
 #include <Eigen/Dense>
 #include <Eigen/SVD>
 
-namespace sophus {
-
-
-}  // namespace sophus
+namespace sophus {}  // namespace sophus

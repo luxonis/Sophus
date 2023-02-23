@@ -50,46 +50,6 @@ void adjointTest(std::string group_name) {
   }
 }
 
-template <class G>
-void leftJacobianTest(std::string group_name) {
-  using Scalar = typename G::Scalar;
-  Scalar const small_eps_sqrt = kEpsilonSqrt<Scalar>;
-
-  for (size_t tangent_id = 0; tangent_id < G::exampleTangents().size();
-       ++tangent_id) {
-    auto x = G::exampleTangents()[tangent_id];
-    G const inv_exp_x = G::exp(x).inverse();
-
-    // Explicit implement the derivative in the Lie Group in first principles
-    // as a vector field: D_x f(x) = D_h log(f(x + h) . f(x)^{-1})
-    Eigen::Matrix<Scalar, G::kDof, G::kDof> const j_num =
-        vectorFieldNumDiff<Scalar, G::kDof, G::kDof>(
-            [&inv_exp_x](auto const& x_plus_delta) {
-              return (G::exp(x_plus_delta) * inv_exp_x).log();
-            },
-            x);
-
-    // Analytical left Jacobian
-    Eigen::Matrix<Scalar, G::kDof, G::kDof> const j = G::exp(x).leftJacobian();
-    FARM_ASSERT_NEAR(
-        j,
-        j_num,
-        Scalar(100) * small_eps_sqrt,
-        "leftJacobianTest #1: {}",
-        group_name);
-
-    // Eigen::Matrix<Scalar, G::kDof, G::kDof> j_inv =
-    // G::leftJacobianInverse(x);
-
-    // FARM_ASSERT_NEAR(
-    //     j,
-    //     j_inv.inverse().eval(),
-    //     Scalar(100) * small_eps_sqrt,
-    //     "leftJacobianTest #2: {}",
-    //     group_name);
-  }
-}
-
 //  bool moreJacobiansTest() {
 //     bool passed = true;
 //     for (auto const& point : point_vec_) {
@@ -775,7 +735,6 @@ void leftJacobianPropTests(
     std::vector<Eigen::Vector<typename G::Scalar, G::kPointDim>> const&
         point_vec) {
   lieGroupPropTests<G>(group_name, point_vec);
-  leftJacobianTest<G>(group_name);
 }
 
 template <class Scalar>
@@ -786,9 +745,9 @@ void testAllGroups2() {
 
   leftJacobianPropTests<sophus::Rotation2<Scalar>>("Rotation(2)", point_vec);
   leftJacobianPropTests<sophus::Scaling2<Scalar>>("Scaling(2)", point_vec);
-  //leftJacobianPropTests<sophus::ScalingRotation2<Scalar>>(
-    //  "ScalingRotation(2)", point_vec);
-       
+  leftJacobianPropTests<sophus::ScalingRotation2<Scalar>>(
+      "ScalingRotation(2)", point_vec);
+
   lieGroupPropTests<sophus::Isometry2<Scalar>>("Isometry(2)", point_vec);
   lieGroupPropTests<sophus::ScalingTranslation2<Scalar>>(
       "ScalingTranslation", point_vec);
