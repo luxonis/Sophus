@@ -191,11 +191,9 @@ template <class Scalar>
 using Rotation2 /*aka SO(2) */ = lie::Subgroup<lie::Rotation2Impl<Scalar>>;
 
 template <class Scalar>
-using Scaling2 = lie::Subgroup<lie::Scaling2Impl<Scalar>>;
-
-// template <class Scalar>
-// using ScalingRotation2 = lie::Subgroup<
-//     lie::DirectProduct<Scalar, lie::Scaling2Impl, lie::Rotation2Impl>>;
+using Scaling2 = lie::Subgroup<lie::ScalingImpl<Scalar, 2>>;
+template <class Scalar>
+using Scaling3 = lie::Subgroup<lie::ScalingImpl<Scalar, 3>>;
 
 template <class Scalar>
 using Isometry2 /*aka SE(2) */ = lie::Group<
@@ -204,6 +202,9 @@ using Isometry2 /*aka SE(2) */ = lie::Group<
 template <class Scalar>
 using ScalingTranslation2 = lie::Group<
     lie::SemiDirectProductWithTranslation<Scalar, 2, lie::Scaling2Impl>>;
+template <class Scalar>
+using ScalingTranslation3 = lie::Group<
+    lie::SemiDirectProductWithTranslation<Scalar, 3, lie::Scaling3Impl>>;
 
 // using SpiralSimilarity; // UniformScaling && Rotation
 // using Similarity; // SpiralSimilarity && Translation

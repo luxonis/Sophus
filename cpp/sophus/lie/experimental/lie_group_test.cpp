@@ -260,7 +260,7 @@ void expLogTest(std::string group_name) {
         matrix_before,
         matrix_after,
         0.001,
-        "\expLogTest: {}\n"
+        "expLogTest: {}\n"
         "params #{}",
         group_name,
         params_id);
@@ -729,13 +729,6 @@ void lieGroupPropTests(
   veeHatTest<G>(group_name);
 }
 
-template <class G>
-void leftJacobianPropTests(
-    std::string group_name,
-    std::vector<Eigen::Vector<typename G::Scalar, G::kPointDim>> const&
-        point_vec) {
-  lieGroupPropTests<G>(group_name, point_vec);
-}
 
 template <class Scalar>
 void testAllGroups2() {
@@ -743,11 +736,29 @@ void testAllGroups2() {
   point_vec.push_back(Eigen::Vector<Scalar, 2>(Scalar(1), Scalar(2)));
   point_vec.push_back(Eigen::Vector<Scalar, 2>(Scalar(1), Scalar(-3)));
 
-  leftJacobianPropTests<sophus::Rotation2<Scalar>>("Rotation(2)", point_vec);
-  leftJacobianPropTests<sophus::Scaling2<Scalar>>("Scaling(2)", point_vec);
+  lieGroupPropTests<sophus::Rotation2<Scalar>>("Rotation(2)", point_vec);
+  lieGroupPropTests<sophus::Scaling2<Scalar>>("Scaling(2)", point_vec);
+
   lieGroupPropTests<sophus::Isometry2<Scalar>>("Isometry(2)", point_vec);
   lieGroupPropTests<sophus::ScalingTranslation2<Scalar>>(
-      "ScalingTranslation", point_vec);
+      "ScalingTranslation(2)", point_vec);
 }
 
-TEST(lie_group_concept, unit) { testAllGroups2<double>(); }
+template <class Scalar>
+void testAllGroups3() {
+  std::vector<Eigen::Vector<Scalar, 3>> point_vec;
+  point_vec.push_back(
+      Eigen::Vector<Scalar, 3>(Scalar(1), Scalar(2), Scalar(0)));
+  point_vec.push_back(
+      Eigen::Vector<Scalar, 3>(Scalar(1), Scalar(-3), Scalar(-1)));
+
+  lieGroupPropTests<sophus::Scaling3<Scalar>>("Scaling(3)", point_vec);
+
+  lieGroupPropTests<sophus::ScalingTranslation3<Scalar>>(
+      "ScalingTranslation(3)", point_vec);
+}
+
+TEST(lie_group_concept, unit) {
+  testAllGroups2<double>();
+  testAllGroups3<double>();
+}

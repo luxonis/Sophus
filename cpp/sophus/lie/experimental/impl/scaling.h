@@ -15,19 +15,19 @@
 namespace sophus {
 namespace lie {
 
-template <class TScalar>
-class Scaling2Impl {
+template <class TScalar, int kDim>
+class ScalingImpl {
  public:
   using Scalar = TScalar;
-  static int const kDof = 2;
-  static int const kNumParams = 2;
-  static int const kPointDim = 2;
-  static int const kAmbientDim = 2;
+  static int const kDof = kDim;
+  static int const kNumParams = kDim;
+  static int const kPointDim = kDim;
+  static int const kAmbientDim = kDim;
 
   // constructors and factories
 
   static auto identityParams() -> Eigen::Vector<Scalar, kNumParams> {
-    return Eigen::Vector<Scalar, 2>(1.0, 1.0);
+    return Eigen::Vector<Scalar, kDim>::Ones();
   }
 
   static auto areParamsValid(
@@ -37,10 +37,9 @@ class Scaling2Impl {
 
     if (!(scale_factors.array() >= kThr).all()) {
       return FARM_UNEXPECTED(
-          "scale factors ({}, {}) not positive.\n",
+          "scale factors ({}) not positive.\n",
           "thr: {}",
-          scale_factors[0],
-          scale_factors[1],
+          scale_factors.transpose(),
           kThr);
     }
     return sophus::Expected<Success>{};
@@ -51,15 +50,13 @@ class Scaling2Impl {
   static auto exp(Eigen::Vector<Scalar, kDof> const& log_scale_factors)
       -> Eigen::Vector<Scalar, kNumParams> {
     using std::exp;
-    return Eigen::Vector<Scalar, 2>(
-        exp(log_scale_factors[0]), exp(log_scale_factors[1]));
+    return log_scale_factors.array().exp();
   }
 
   static auto log(Eigen::Vector<Scalar, kNumParams> const& scale_factors)
       -> Eigen::Vector<Scalar, kDof> {
     using std::log;
-    return Eigen::Vector<Scalar, 2>(
-        log(scale_factors[0]), log(scale_factors[1]));
+    return scale_factors.array().log();
   }
 
   static auto hat(Eigen::Vector<Scalar, kDof> const& scale_factors)
@@ -86,16 +83,18 @@ class Scaling2Impl {
 
   static auto inverse(Eigen::Vector<Scalar, kNumParams> const& scale_factors)
       -> Eigen::Vector<Scalar, kNumParams> {
-    return Eigen::Vector<Scalar, 2>(
-        1.0 / scale_factors[0], 1.0 / scale_factors[1]);
+    Eigen::Vector<Scalar, kDim> params;
+    for (int i = 0; i < kDof; ++i) {
+      params[i] = 1.0 / scale_factors[i];
+    }
+    return params;
   }
 
   static auto multiplication(
       Eigen::Vector<Scalar, kNumParams> const& lhs_params,
       Eigen::Vector<Scalar, kNumParams> const& rhs_params)
       -> Eigen::Vector<Scalar, kNumParams> {
-    return Eigen::Vector<Scalar, 2>(
-        lhs_params[0] * rhs_params[0], lhs_params[1] * rhs_params[1]);
+    return lhs_params.array() * rhs_params.array();
   }
 
   // Point actions
@@ -104,8 +103,7 @@ class Scaling2Impl {
       Eigen::Vector<Scalar, kNumParams> const& scale_factors,
       Eigen::Vector<Scalar, kPointDim> const& point)
       -> Eigen::Vector<Scalar, kPointDim> {
-    return Eigen::Vector<Scalar, 2>(
-        point[0] * scale_factors[0], point[1] * scale_factors[1]);
+    return scale_factors.array() * point.array();
   }
 
   static auto toAmbient(Eigen::Vector<Scalar, kPointDim> const& point)
@@ -117,8 +115,7 @@ class Scaling2Impl {
   static auto compactMatrix(
       Eigen::Vector<Scalar, kNumParams> const& scale_factors)
       -> Eigen::Matrix<Scalar, kPointDim, kAmbientDim> {
-    return Eigen::Matrix<Scalar, 2, 2>{
-        {scale_factors[0], 0.0}, {0.0, scale_factors[1]}};
+    return hat(scale_factors);
   }
 
   static auto matrix(Eigen::Vector<Scalar, kNumParams> const& scale_factors)
@@ -148,22 +145,51 @@ class Scaling2Impl {
   // for tests
 
   static auto exampleTangents() -> std::vector<Eigen::Vector<Scalar, kDof>> {
-    return std::vector<Eigen::Vector<Scalar, kDof>>({
-        Eigen::Vector<Scalar, kDof>({std::exp(1.0), std::exp(1.0)}),
-        Eigen::Vector<Scalar, kDof>({1.1, 1.1}),
-        Eigen::Vector<Scalar, kDof>({2.0, 1.1}),
-        Eigen::Vector<Scalar, kDof>({2.0, std::exp(1.0)}),
-    });
+    if constexpr (kPointDim == 2) {
+      return std::vector<Eigen::Vector<Scalar, kDof>>({
+          Eigen::Vector<Scalar, kDof>({std::exp(1.0), std::exp(1.0)}),
+          Eigen::Vector<Scalar, kDof>({1.1, 1.1}),
+          Eigen::Vector<Scalar, kDof>({2.0, 1.1}),
+          Eigen::Vector<Scalar, kDof>({2.0, std::exp(1.0)}),
+      });
+    } else {
+      if constexpr (kPointDim == 3) {
+        return std::vector<Eigen::Vector<Scalar, kDof>>({
+            Eigen::Vector<Scalar, kDof>(
+                {std::exp(1.0), std::exp(1.0), std::exp(1.0)}),
+            Eigen::Vector<Scalar, kDof>({1.1, 1.1, 1.7}),
+            Eigen::Vector<Scalar, kDof>({2.0, 1.1, 2.0}),
+            Eigen::Vector<Scalar, kDof>({2.0, std::exp(1.0), 2.2}),
+        });
+      }
+    }
   }
 
   static auto exampleParams()
       -> std::vector<Eigen::Vector<Scalar, kNumParams>> {
-    return std::vector<Eigen::Vector<Scalar, kDof>>(
-        {Eigen::Vector<Scalar, kDof>({1.0, 1.0}),
-         Eigen::Vector<Scalar, kDof>({1.0, 2.0}),
-         Eigen::Vector<Scalar, kDof>({1.5, 1.0}),
-         Eigen::Vector<Scalar, kDof>({5.0, 1.237})});
+    if constexpr (kPointDim == 2) {
+      return std::vector<Eigen::Vector<Scalar, kNumParams>>(
+          {Eigen::Vector<Scalar, kNumParams>({1.0, 1.0}),
+           Eigen::Vector<Scalar, kNumParams>({1.0, 2.0}),
+           Eigen::Vector<Scalar, kNumParams>({1.5, 1.0}),
+           Eigen::Vector<Scalar, kNumParams>({5.0, 1.237})});
+    } else {
+      if constexpr (kPointDim == 3) {
+       return std::vector<Eigen::Vector<Scalar, kNumParams>>(
+          {Eigen::Vector<Scalar, kNumParams>({1.0, 1.0, 1.0}),
+           Eigen::Vector<Scalar, kNumParams>({1.0, 2.0, 1.05}),
+           Eigen::Vector<Scalar, kNumParams>({1.5, 1.0, 2.8}),
+           Eigen::Vector<Scalar, kNumParams>({5.0, 1.237, 2})});
+      }
+    }
   }
 };
+
+template <class TScalar>
+using Scaling2Impl = ScalingImpl<TScalar, 2>;
+
+template <class TScalar>
+using Scaling3Impl = ScalingImpl<TScalar, 3>;
+
 }  // namespace lie
 }  // namespace sophus
