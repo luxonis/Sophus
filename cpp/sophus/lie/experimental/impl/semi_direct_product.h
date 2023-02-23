@@ -42,7 +42,7 @@ class SemiDirectProductWithTranslation {
 
   static auto areParamsValid(Eigen::Vector<Scalar, kNumParams> const& params)
       -> sophus::Expected<Success> {
-    return SubGroup::areParamsValid(subGroupParams(params));
+    return SubGroup::areParamsValid(subgroupParams(params));
   }
 
   // Manifold / Lie Group concepts
@@ -53,16 +53,17 @@ class SemiDirectProductWithTranslation {
         SubGroup::exp(subgroupTangent(tangent));
     return params(
         subgroup_params,
-        (SubGroup::matV(subgroup_params) * translationTangent(tangent)).eval());
+        (SubGroup::matV(subgroupTangent(tangent)) * translationTangent(tangent))
+            .eval());
   }
 
   static auto log(Eigen::Vector<Scalar, kNumParams> const& params)
       -> Eigen::Vector<Scalar, kDof> {
-    Eigen::Vector<Scalar, SubGroup::kNumParams> subgroup_params =
-        subGroupParams(params);
+    Eigen::Vector<Scalar, SubGroup::kDof> subgroup_tangent =
+        SubGroup::log(subgroupParams(params));
     return tangent(
-        SubGroup::matVInverse(subgroup_params) * translation(params),
-        SubGroup::log(subgroup_params));
+        SubGroup::matVInverse(subgroup_tangent) * translation(params),
+        subgroup_tangent);
   }
 
   static auto hat(Eigen::Vector<Scalar, kDof> const& tangent)
@@ -89,7 +90,7 @@ class SemiDirectProductWithTranslation {
     Eigen::Matrix<Scalar, kDof, kDof> mat_adjoint;
 
     Eigen::Vector<Scalar, SubGroup::kNumParams> subgroup_params =
-        subGroupParams(params);
+        subgroupParams(params);
 
     mat_adjoint.template topLeftCorner<kPointDim, kPointDim>() =
         SubGroup::matrix(subgroup_params);
@@ -111,7 +112,7 @@ class SemiDirectProductWithTranslation {
       -> Eigen::Vector<Scalar, kNumParams> {
     Eigen::Vector<Scalar, SubGroup::kNumParams> subgroup_params =
         SubGroup::multiplication(
-            subGroupParams(lhs_params), subGroupParams(rhs_params));
+            subgroupParams(lhs_params), subgroupParams(rhs_params));
     return SemiDirectProductWithTranslation::params(
         subgroup_params,
         SubGroup::action(subgroup_params, translation(params)));
@@ -120,7 +121,7 @@ class SemiDirectProductWithTranslation {
   static auto inverse(Eigen::Vector<Scalar, kNumParams> const& params)
       -> Eigen::Vector<Scalar, kNumParams> {
     Eigen::Vector<Scalar, SubGroup::kNumParams> subgroup_params =
-        SubGroup::inverse(subGroupParams(params));
+        SubGroup::inverse(subgroupParams(params));
     return SemiDirectProductWithTranslation::params(
         subgroup_params,
         (-SubGroup::action(subgroup_params, translation(params))).eval());
@@ -132,7 +133,7 @@ class SemiDirectProductWithTranslation {
       Eigen::Vector<Scalar, kNumParams> const& params,
       Eigen::Vector<Scalar, kPointDim> const& point)
       -> Eigen::Vector<Scalar, kPointDim> {
-    return SubGroup::action(subGroupParams(params), point) +
+    return SubGroup::action(subgroupParams(params), point) +
            translation(params);
   }
 
@@ -147,7 +148,7 @@ class SemiDirectProductWithTranslation {
       -> Eigen::Matrix<Scalar, kPointDim, kAmbientDim> {
     Eigen::Matrix<Scalar, kPointDim, kAmbientDim> mat;
     mat.template topLeftCorner<kPointDim, kPointDim>() =
-        SubGroup::compactMatrix(subGroupParams(params));
+        SubGroup::compactMatrix(subgroupParams(params));
     mat.template topRightCorner<kPointDim, 1>() = translation(params);
     return mat;
   }
@@ -186,7 +187,7 @@ class SemiDirectProductWithTranslation {
   }
 
  private:
-  static auto subGroupParams(Eigen::Vector<Scalar, kNumParams> const& params)
+  static auto subgroupParams(Eigen::Vector<Scalar, kNumParams> const& params)
       -> Eigen::Vector<Scalar, SubGroup::kNumParams> {
     return params.template head<SubGroup::kNumParams>();
   }

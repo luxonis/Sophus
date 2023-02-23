@@ -178,7 +178,7 @@ class So3Base {
       angleZ() const {
     Eigen::Matrix3<Scalar> r = matrix();
     Eigen::Matrix2<Scalar> rz = r.template block<2, 2>(0, 0);
-    return So2<Scalar>(makeRotationMatrix(rz)).log();
+    return So2<Scalar>(makeRotationMatrix(rconjugatez)).log();
   }
 
   /// Returns copy of instance casted to NewScalarType.

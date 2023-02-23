@@ -13,6 +13,7 @@
 
 #include "sophus/lie/experimental/impl/identity.h"
 #include "sophus/lie/experimental/impl/rotation2.h"
+#include "sophus/lie/experimental/impl/rotation3.h"
 #include "sophus/lie/experimental/impl/scaling.h"
 #include "sophus/lie/experimental/impl/semi_direct_product.h"
 #include "sophus/lie/experimental/lie_group_concept.h"
@@ -130,80 +131,29 @@ class Group {
   Eigen::Vector<Scalar, kNumParams> params_;
 };
 
-template <LieSubgroupImplConcept TImpl>
-class Subgroup : public Group<TImpl> {
- public:
-  using Scalar = typename TImpl::Scalar;
-  static int constexpr kDof = TImpl::kDof;
-  static int constexpr kNumParams = TImpl::kNumParams;
-  static int constexpr kPointDim = TImpl::kPointDim;
-  static int constexpr kAmbientDim = TImpl::kAmbientDim;
-
-  // constructors and factories
-
-  Subgroup() : Group<TImpl>() {}
-  Subgroup(Subgroup const&) = default;
-  Subgroup& operator=(Subgroup const&) = default;
-
-  Subgroup(Group<TImpl>&& base) : Group<TImpl>(base) {}
-
-  static auto fromParams(Eigen::Vector<Scalar, kNumParams> const& params)
-      -> Subgroup {
-    return Subgroup(Group<TImpl>::fromParams(params));
-  }
-
-  // Manifold / Lie Group concepts
-
-  static auto exp(Eigen::Vector<Scalar, kDof> const& tangent) -> Subgroup {
-    return Subgroup(Group<TImpl>::exp(tangent));
-  }
-
-  // group operations
-
-  auto operator*(Subgroup const& rhs) const -> Subgroup {
-    return Subgroup(this->Group<TImpl>::operator*(rhs));
-  }
-
-  auto inverse() const -> Subgroup {
-    return Subgroup(this->Group<TImpl>::inverse());
-  }
-
-  // Point actions
-
-  // needed so the operator* for group multiplication does not hide the point
-  // action multiplication from the base.
-  using Group<TImpl>::operator*;
-
-  // subgroup concepts
-
-  auto matV() const -> Eigen::Matrix<Scalar, kPointDim, kPointDim> {
-    return TImpl::matV(this->params_);
-  }
-
-  auto matVInverse(Eigen::Vector<Scalar, kNumParams> const&) const
-      -> Eigen::Matrix<Scalar, kPointDim, kPointDim> {
-    return TImpl::matVInverse(this->params_);
-  }
-};
-
 }  // namespace lie
 
 template <class Scalar>
-using Identity2 = lie::Subgroup<lie::Identity2Impl<Scalar>>;
+using Identity2 = lie::Group<lie::Identity2Impl<Scalar>>;
 template <class Scalar>
-using Identity3 = lie::Subgroup<lie::Identity3Impl<Scalar>>;
+using Identity3 = lie::Group<lie::Identity3Impl<Scalar>>;
 
 template <class Scalar>
-using Rotation2 /*aka SO(2) */ = lie::Subgroup<lie::Rotation2Impl<Scalar>>;
+using Rotation2 /*aka SO(2) */ = lie::Group<lie::Rotation2Impl<Scalar>>;
+template <class Scalar>
+using Rotation3 /*aka SO(3) */ = lie::Group<lie::Rotation3Impl<Scalar>>;
 
 template <class Scalar>
-using Scaling2 = lie::Subgroup<lie::ScalingImpl<Scalar, 2>>;
+using Scaling2 = lie::Group<lie::ScalingImpl<Scalar, 2>>;
 template <class Scalar>
-using Scaling3 = lie::Subgroup<lie::ScalingImpl<Scalar, 3>>;
+using Scaling3 = lie::Group<lie::ScalingImpl<Scalar, 3>>;
 
 template <class Scalar>
 using Isometry2 /*aka SE(2) */ = lie::Group<
     lie::SemiDirectProductWithTranslation<Scalar, 2, lie::Rotation2Impl>>;
+template <class Scalar>
+using Isometry3 /*aka SE(3) */ = lie::Group<
+    lie::SemiDirectProductWithTranslation<Scalar, 3, lie::Rotation3Impl>>;
 
 template <class Scalar>
 using Translation2 = lie::Group<

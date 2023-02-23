@@ -125,7 +125,7 @@ class ScalingImpl {
 
   // subgroup concepts
 
-  static auto matV(Eigen::Vector<Scalar, kNumParams> const&)
+  static auto matV(Eigen::Vector<Scalar, kDof> const&)
       -> Eigen::Matrix<Scalar, kPointDim, kPointDim> {
     return Eigen::Matrix<Scalar, kPointDim, kPointDim>::Identity();
   }

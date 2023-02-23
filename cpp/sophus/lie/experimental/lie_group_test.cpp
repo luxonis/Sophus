@@ -753,8 +753,10 @@ void testAllGroups3() {
       Eigen::Vector<Scalar, 3>(Scalar(1), Scalar(-3), Scalar(-1)));
 
   lieGroupPropTests<sophus::Identity3<Scalar>>("Identity(3)", point_vec);
+  lieGroupPropTests<sophus::Rotation3<Scalar>>("Rotation(3)", point_vec);
   lieGroupPropTests<sophus::Scaling3<Scalar>>("Scaling(3)", point_vec);
   lieGroupPropTests<sophus::Translation3<Scalar>>("Translation(3)", point_vec);
+  lieGroupPropTests<sophus::Isometry3<Scalar>>("Isometry(3)", point_vec);
   lieGroupPropTests<sophus::ScalingTranslation3<Scalar>>(
       "ScalingTranslation(3)", point_vec);
 }

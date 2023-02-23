@@ -106,12 +106,12 @@ class IdentityImpl {
 
   // subgroup concepts
 
-  static auto matV(Eigen::Vector<Scalar, kNumParams> const&)
+  static auto matV(Eigen::Vector<Scalar, kDof> const&)
       -> Eigen::Matrix<Scalar, kPointDim, kPointDim> {
     return Eigen::Matrix<Scalar, kPointDim, kPointDim>::Identity();
   }
 
-  static auto matVInverse(Eigen::Vector<Scalar, kNumParams> const&)
+  static auto matVInverse(Eigen::Vector<Scalar, kDof> const&)
       -> Eigen::Matrix<Scalar, kPointDim, kPointDim> {
     return Eigen::Matrix<Scalar, kPointDim, kPointDim>::Identity();
   }

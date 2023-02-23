@@ -31,10 +31,6 @@ class ComplexNumberImpl {
         lhs_real_imag.x() * rhs_real_imag.y() +
             lhs_real_imag.y() * rhs_real_imag.x());
   }
-
-  static auto squaredNorm(Eigen::Vector<Scalar, 2> const& real_imag) -> double {
-    return real_imag.squaredNorm();
-  }
 };
 
 template <class TScalar>
@@ -160,12 +156,12 @@ class Rotation2Impl {
   }
 
   // Sub-group concepts
-  static auto matV(Eigen::Vector<Scalar, kNumParams> const&)
+  static auto matV(Eigen::Vector<Scalar, kDof> const&)
       -> Eigen::Matrix<Scalar, kPointDim, kPointDim> {
     return Eigen::Matrix<Scalar, kPointDim, kPointDim>::Identity();
   }
 
-  static auto matVInverse(Eigen::Vector<Scalar, kNumParams> const&)
+  static auto matVInverse(Eigen::Vector<Scalar, kDof> const&)
       -> Eigen::Matrix<Scalar, kPointDim, kPointDim> {
     return Eigen::Matrix<Scalar, kPointDim, kPointDim>::Identity();
   }

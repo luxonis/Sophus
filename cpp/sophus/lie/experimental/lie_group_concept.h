@@ -107,15 +107,16 @@ concept LieGroupImplConcept =
 template <class T>
 concept LieSubgroupImplConcept = LieGroupImplConcept<T> && requires(
     T g,
+    Eigen::Vector<typename T::Scalar, T::kDof> tangent,
     Eigen::Vector<typename T::Scalar, T::kNumParams> params,
     Eigen::Vector<typename T::Scalar, T::kPointDim> point) {
   {
-    T::matV(params)
+    T::matV(tangent)
     } -> ConvertibleTo<
         Eigen::Matrix<typename T::Scalar, T::kPointDim, T::kPointDim>>;
 
   {
-    T::matVInverse(params)
+    T::matVInverse(tangent)
     } -> ConvertibleTo<
         Eigen::Matrix<typename T::Scalar, T::kPointDim, T::kPointDim>>;
 

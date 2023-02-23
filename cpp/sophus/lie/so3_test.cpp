@@ -60,6 +60,7 @@ class Tests {
         So3Type::exp(Point(Scalar(0.3), Scalar(0.5), Scalar(0.1))) *
         So3Type::exp(Point(k_pi, Scalar(0), Scalar(0))) *
         So3Type::exp(Point(Scalar(-0.3), Scalar(-0.5), Scalar(-0.1))));
+
     tangent_vec_.push_back(Tangent(Scalar(0), Scalar(0), Scalar(0)));
     tangent_vec_.push_back(Tangent(Scalar(1), Scalar(0), Scalar(0)));
     tangent_vec_.push_back(Tangent(Scalar(0), Scalar(1), Scalar(0)));
