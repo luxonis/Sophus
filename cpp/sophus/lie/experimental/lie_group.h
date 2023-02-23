@@ -11,6 +11,7 @@
 
 #pragma once
 
+#include "sophus/lie/experimental/impl/identity.h"
 #include "sophus/lie/experimental/impl/rotation2.h"
 #include "sophus/lie/experimental/impl/scaling.h"
 #include "sophus/lie/experimental/impl/semi_direct_product.h"
@@ -188,6 +189,11 @@ class Subgroup : public Group<TImpl> {
 }  // namespace lie
 
 template <class Scalar>
+using Identity2 = lie::Subgroup<lie::Identity2Impl<Scalar>>;
+template <class Scalar>
+using Identity3 = lie::Subgroup<lie::Identity3Impl<Scalar>>;
+
+template <class Scalar>
 using Rotation2 /*aka SO(2) */ = lie::Subgroup<lie::Rotation2Impl<Scalar>>;
 
 template <class Scalar>
@@ -198,6 +204,13 @@ using Scaling3 = lie::Subgroup<lie::ScalingImpl<Scalar, 3>>;
 template <class Scalar>
 using Isometry2 /*aka SE(2) */ = lie::Group<
     lie::SemiDirectProductWithTranslation<Scalar, 2, lie::Rotation2Impl>>;
+
+template <class Scalar>
+using Translation2 = lie::Group<
+    lie::SemiDirectProductWithTranslation<Scalar, 2, lie::Identity2Impl>>;
+template <class Scalar>
+using Translation3 = lie::Group<
+    lie::SemiDirectProductWithTranslation<Scalar, 3, lie::Identity3Impl>>;
 
 template <class Scalar>
 using ScalingTranslation2 = lie::Group<

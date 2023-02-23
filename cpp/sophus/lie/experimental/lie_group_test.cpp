@@ -735,9 +735,10 @@ void testAllGroups2() {
   point_vec.push_back(Eigen::Vector<Scalar, 2>(Scalar(1), Scalar(2)));
   point_vec.push_back(Eigen::Vector<Scalar, 2>(Scalar(1), Scalar(-3)));
 
+  lieGroupPropTests<sophus::Identity2<Scalar>>("Identity(2)", point_vec);
   lieGroupPropTests<sophus::Rotation2<Scalar>>("Rotation(2)", point_vec);
   lieGroupPropTests<sophus::Scaling2<Scalar>>("Scaling(2)", point_vec);
-
+  lieGroupPropTests<sophus::Translation2<Scalar>>("Translation(2)", point_vec);
   lieGroupPropTests<sophus::Isometry2<Scalar>>("Isometry(2)", point_vec);
   lieGroupPropTests<sophus::ScalingTranslation2<Scalar>>(
       "ScalingTranslation(2)", point_vec);
@@ -751,8 +752,9 @@ void testAllGroups3() {
   point_vec.push_back(
       Eigen::Vector<Scalar, 3>(Scalar(1), Scalar(-3), Scalar(-1)));
 
+  lieGroupPropTests<sophus::Identity3<Scalar>>("Identity(3)", point_vec);
   lieGroupPropTests<sophus::Scaling3<Scalar>>("Scaling(3)", point_vec);
-
+  lieGroupPropTests<sophus::Translation3<Scalar>>("Translation(3)", point_vec);
   lieGroupPropTests<sophus::ScalingTranslation3<Scalar>>(
       "ScalingTranslation(3)", point_vec);
 }
