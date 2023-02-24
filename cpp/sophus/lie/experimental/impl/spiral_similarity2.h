@@ -10,21 +10,19 @@
 /// Cartesian - Euclidean vector space as Lie group
 
 #pragma once
-#include "sophus/lie/experimental/lie_group_concept.h"
 #include "sophus/lie/experimental/impl/complex.h"
-
+#include "sophus/lie/experimental/lie_group_concept.h"
 
 namespace sophus {
 namespace lie {
 
-
 template <class TScalar>
-class Rotation2Impl {
+class SpiralSimilarity2Impl {
  public:
   using Scalar = TScalar;
   using Complex = ComplexNumberImpl<TScalar>;
 
-  static int const kDof = 1;
+  static int const kDof = 2;
   static int const kNumParams = 2;
   static int const kPointDim = 2;
   static int const kAmbientDim = 2;
@@ -36,17 +34,17 @@ class Rotation2Impl {
   }
 
   static auto areParamsValid(
-      Eigen::Vector<Scalar, kNumParams> const& unit_complex)
+      Eigen::Vector<Scalar, kNumParams> const& non_zero_complex)
       -> sophus::Expected<Success> {
-    static const Scalar kThr = kEpsilon<Scalar>;
-    const Scalar squared_norm = unit_complex.squaredNorm();
+    static const Scalar kThr = kEpsilon<Scalar> * kEpsilon<Scalar>;
+    const Scalar squared_norm = non_zero_complex.squaredNorm();
     using std::abs;
-    if (!(abs(squared_norm - 1.0) <= kThr)) {
+    if (!(squared_norm < kThr || squared_norm > 1.0 / kThr)) {
       return FARM_UNEXPECTED(
-          "complex number ({}, {}) is not unit length.\n"
+          "complex number ({}, {}) is too large or too small.\n"
           "Squared norm: {}, thr: {}",
-          unit_complex[0],
-          unit_complex[1],
+          non_zero_complex[0],
+          non_zero_complex[1],
           squared_norm,
           kThr);
     }
@@ -55,27 +53,43 @@ class Rotation2Impl {
 
   // Manifold / Lie Group concepts
 
-  static auto exp(Eigen::Vector<Scalar, kDof> const& angle)
+  static auto exp(Eigen::Vector<Scalar, kDof> const& angle_logscale)
       -> Eigen::Vector<Scalar, kNumParams> {
-    using std::cos;
-    using std::sin;
-    return Eigen::Vector<Scalar, 2>(cos(angle[0]), sin(angle[0]));
+    using std::exp;
+    using std::max;
+    using std::min;
+
+    Scalar const sigma = angle_logscale[1];
+    Scalar s = exp(sigma);
+    // Ensuring proper scale
+    s = max(s, kEpsilonPlus<Scalar>);
+    s = min(s, Scalar(1.) / kEpsilonPlus<Scalar>);
+    Eigen::Vector2<Scalar> z =
+        Rotation2Impl<Scalar>::exp(angle_logscale.template head<1>())
+            .unitComplex();
+    z *= s;
+    return z;
   }
 
-  static auto log(Eigen::Vector<Scalar, kNumParams> const& unit_complex)
+  static auto log(Eigen::Vector<Scalar, kNumParams> const& complex)
       -> Eigen::Vector<Scalar, kDof> {
-    using std::atan2;
-    return Eigen::Vector<Scalar, 1>{atan2(unit_complex.y(), unit_complex.x())};
+    using std::log;
+    Eigen::Vector<Scalar, kDof> theta_sigma;
+    theta_sigma[0] = Rotation2Impl<Scalar>::log(complex)[0];
+    theta_sigma[1] = log(complex.norm());
+    return theta_sigma;
   }
 
-  static auto hat(Eigen::Vector<Scalar, kDof> const& angle)
+  static auto hat(Eigen::Vector<Scalar, kDof> const& angle_logscale)
       -> Eigen::Matrix<Scalar, kAmbientDim, kAmbientDim> {
-    return Eigen::Matrix<Scalar, 2, 2>{{0, -angle[0]}, {angle[0], 0}};
+    return Eigen::Matrix<Scalar, 2, 2>{
+        {angle_logscale[1], -angle_logscale[0]},
+        {angle_logscale[0], angle_logscale[1]}};
   }
 
   static auto vee(Eigen::Matrix<Scalar, kAmbientDim, kAmbientDim> const& mat)
       -> Eigen::Matrix<Scalar, kDof, 1> {
-    return Eigen::Matrix<Scalar, kDof, 1>{mat(1, 0)};
+    return Eigen::Matrix<Scalar, kDof, 1>{mat(1, 0), mat(0,0)};
   }
 
   static auto adj(Eigen::Vector<Scalar, kNumParams> const&)
@@ -96,20 +110,19 @@ class Rotation2Impl {
       Eigen::Vector<Scalar, kNumParams> const& rhs_params)
       -> Eigen::Vector<Scalar, kNumParams> {
     auto result = Complex::multiplication(lhs_params, rhs_params);
-    Scalar const squared_norm = result.squaredNorm();
+    Scalar const squared_scale = result.squaredNorm();
 
-    // We can assume that the squared-norm is close to 1 since we deal with a
-    // unit complex number. Due to numerical precision issues, there might
-    // be a small drift after pose concatenation. Hence, we need to renormalizes
-    // the complex number here.
-    // Since squared-norm is close to 1, we do not need to calculate the costly
-    // square-root, but can use an approximation around 1 (see
-    // http://stackoverflow.com/a/12934750 for details).
-    if (squared_norm != 1.0) {
-      Scalar const scale = 2.0 / (1.0 + squared_norm);
-      return scale * result;
+    if (squared_scale < kEpsilon<ResultT> * kEpsilon<ResultT>) {
+      /// Saturation to ensure class invariant.
+      result_complex.normalize();
+      result_complex *= kEpsilonPlus<ResultT>;
     }
-    return result;
+    if (squared_scale > Scalar(1.) / (kEpsilon<ResultT> * kEpsilon<ResultT>)) {
+      /// Saturation to ensure class invariant.
+      result_complex.normalize();
+      result_complex /= kEpsilonPlus<ResultT>;
+    }
+    return RxSo2Product<TOtherDerived>(result_complex);
   }
 
   // Point actions

@@ -16,7 +16,7 @@
 // Include only the selective set of Eigen headers that we need.
 // This helps when using Sophus with unusual compilers, like nvcc.
 #include "sophus/common/types.h"
-#include "sophus/linalg/rotation_matrix.h"
+#include "sophus/linalg/orthogonal.h"
 
 #include <Eigen/LU>
 

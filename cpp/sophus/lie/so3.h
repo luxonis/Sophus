@@ -13,7 +13,7 @@
 
 #include "sophus/common/types.h"
 #include "sophus/lie/so2.h"
-#include "sophus/linalg/rotation_matrix.h"
+#include "sophus/linalg/orthogonal.h"
 
 // Include only the selective set of Eigen headers that we need.
 // This helps when using Sophus with unusual compilers, like nvcc.

@@ -14,6 +14,8 @@
 #include "sophus/lie/experimental/impl/identity.h"
 #include "sophus/lie/experimental/impl/rotation2.h"
 #include "sophus/lie/experimental/impl/rotation3.h"
+#include "sophus/lie/experimental/impl/spiral_similarity2.h"
+
 #include "sophus/lie/experimental/impl/scaling.h"
 #include "sophus/lie/experimental/impl/semi_direct_product.h"
 #include "sophus/lie/experimental/lie_group_concept.h"
@@ -169,6 +171,7 @@ template <class Scalar>
 using ScalingTranslation3 = lie::Group<
     lie::SemiDirectProductWithTranslation<Scalar, 3, lie::Scaling3Impl>>;
 
+// using Scalar = Uniform scaling.
 // using SpiralSimilarity; // UniformScaling && Rotation
 // using Similarity; // SpiralSimilarity && Translation
 // using Dilation; // UniformScaling && Translation
