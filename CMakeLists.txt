@@ -6,8 +6,10 @@ include(GNUInstallDirs)
 
 farm_ng_module()
 
+set(farm_ng_cmake_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../farm_ng_cmake/cmake)
+include(${farm_ng_cmake_DIR}/farm_ng_cmakeConfig.cmake)
+
 find_package(Eigen3 3.4.0 REQUIRED)
-find_package(farm_ng_core 0.1.0 REQUIRED)
 
 
 # Determine if sophus is built as a subproject (using add_subdirectory)
