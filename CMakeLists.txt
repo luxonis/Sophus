@@ -4,7 +4,6 @@ project(Sophus VERSION 2.0.0)
 include(CMakePackageConfigHelpers)
 include(GNUInstallDirs)
 
-find_package(farm_ng_cmake 0.1.0 REQUIRED)
 farm_ng_module()
 
 find_package(Eigen3 3.4.0 REQUIRED)
