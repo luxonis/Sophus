@@ -10,7 +10,6 @@ project(Sophus VERSION 1.22.10)
 include(CMakePackageConfigHelpers)
 include(GNUInstallDirs)
 
-hunter_add_package(fmt)
 hunter_add_package(Eigen)
 
 # Determine if sophus is built as a subproject (using add_subdirectory)
