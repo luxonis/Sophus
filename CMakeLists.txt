@@ -1,8 +1,17 @@
 cmake_minimum_required(VERSION 3.4)
+include("cmake/HunterGate.cmake")
+HunterGate(
+    URL "https://github.com/cpp-pm/hunter/archive/v0.23.322.tar.gz"
+    SHA1 "cb0ea1f74f4a2c49a807de34885743495fccccbe"
+    LOCAL # Local config for dependencies
+)
 project(Sophus VERSION 1.22.10)
 
 include(CMakePackageConfigHelpers)
 include(GNUInstallDirs)
+
+hunter_add_package(fmt)
+hunter_add_package(Eigen)
 
 # Determine if sophus is built as a subproject (using add_subdirectory)
 # or if it is the master project.
@@ -54,7 +63,7 @@ endif()
 # defined by a parent project including Sophus via `add_subdirectory`.)
 
 if(NOT TARGET Eigen3::Eigen)
-  find_package(Eigen3 3.3.0 REQUIRED)
+  find_package(Eigen3 3.4.0 REQUIRED)
 endif()
 
 if(NOT TARGET fmt::fmt)
