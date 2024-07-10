@@ -14,19 +14,19 @@ bool testSmokeDetails() {
   bool passed = true;
   std::cout << details::pretty(4.2) << std::endl;
   std::cout << details::pretty(Vector2f(1, 2)) << std::endl;
-  bool dummy = true;
-  details::testFailed(dummy, "dummyFunc", "dummyFile", 99,
-                      "This is just a practice alarm!");
-  SOPHUS_TEST_EQUAL(passed, dummy, false, "");
+
+  SOPHUS_TEST(passed, false, "Just a practice alarm");
+  if (passed) {
+    exit(-1);
+  }
+
+  passed = true;
 
   double val = transpose(42.0);
   SOPHUS_TEST_EQUAL(passed, val, 42.0, "");
   Matrix<float, 1, 2> row = transpose(Vector2f(1, 7));
   Matrix<float, 1, 2> expected_row(1, 7);
   SOPHUS_TEST_EQUAL(passed, row, expected_row, "");
-
-  optional<int> opt(nullopt);
-  SOPHUS_TEST(passed, !opt, "");
 
   return passed;
 }
@@ -77,8 +77,8 @@ bool testSpline() {
 
   BasisSplineImpl<SE3d> spline(control_poses, 1.0);
 
-  SE3d T = spline.parent_T_spline(0.0, 1.0);
-  SE3d T2 = spline.parent_T_spline(1.0, 0.0);
+  SE3d T = spline.parent_T_spline(0, 1.0);
+  SE3d T2 = spline.parent_T_spline(1, 0.0);
 
   Eigen::Matrix3d R = T.so3().matrix();
   Eigen::Matrix3d R2 = T2.so3().matrix();
@@ -89,19 +89,19 @@ bool testSpline() {
 
   SOPHUS_TEST_APPROX(passed, t, t2, kSmallEpsSqrt, "lambdsa");
 
-  Eigen::Matrix4d Dt_parent_T_spline = spline.Dt_parent_T_spline(0.0, 0.5);
+  Eigen::Matrix4d Dt_parent_T_spline = spline.Dt_parent_T_spline(0, 0.5);
   Eigen::Matrix4d Dt_parent_T_spline2 = curveNumDiff(
       [&](double u_bar) -> Eigen::Matrix4d {
-        return spline.parent_T_spline(0.0, u_bar).matrix();
+        return spline.parent_T_spline(0, u_bar).matrix();
       },
       0.5);
   SOPHUS_TEST_APPROX(passed, Dt_parent_T_spline, Dt_parent_T_spline2,
                      kSmallEpsSqrt, "Dt_parent_T_spline");
 
-  Eigen::Matrix4d Dt2_parent_T_spline = spline.Dt2_parent_T_spline(0.0, 0.5);
+  Eigen::Matrix4d Dt2_parent_T_spline = spline.Dt2_parent_T_spline(0, 0.5);
   Eigen::Matrix4d Dt2_parent_T_spline2 = curveNumDiff(
       [&](double u_bar) -> Eigen::Matrix4d {
-        return spline.Dt_parent_T_spline(0.0, u_bar).matrix();
+        return spline.Dt_parent_T_spline(0, u_bar).matrix();
       },
       0.5);
   SOPHUS_TEST_APPROX(passed, Dt2_parent_T_spline, Dt2_parent_T_spline2,
